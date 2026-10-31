@@ -15,6 +15,7 @@ export const MODEL = {
   gimmickMultiplier: {
     mega: 1.5,
     dynamax: 1.5,
+    gigantamax: 1.5, // treated like Dynamax until measured
     zmove: 1.8,
     tagMove: 1.8,
     doubleMove: 1.8,
@@ -31,7 +32,7 @@ export const MODEL = {
 };
 
 /** Special moves the game limits to one use per battle ("per play" counts as per battle here). */
-export const LIMITED_GIMMICKS: ReadonlySet<Gimmick> = new Set<Gimmick>(['mega', 'dynamax', 'zmove']);
+export const LIMITED_GIMMICKS: ReadonlySet<Gimmick> = new Set<Gimmick>(['mega', 'dynamax', 'gigantamax', 'zmove']);
 
 /** opponents[0] is the Boss; [1] and [2] are the cronies. */
 export type Battle = { opponents: [Tag, Tag, Tag]; targetIndex: 0 | 1 | 2 };

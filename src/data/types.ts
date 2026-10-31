@@ -6,12 +6,13 @@ export type PokemonType = (typeof POKEMON_TYPES)[number];
 
 export type Grade = 2 | 3 | 4 | 5 | 6; // 5 = Star, 6 = Superstar
 
-export const GIMMICKS = ['mega', 'dynamax', 'zmove', 'tagMove', 'doubleMove', 'chainAttack'] as const;
+export const GIMMICKS = ['mega', 'dynamax', 'gigantamax', 'zmove', 'tagMove', 'doubleMove', 'chainAttack'] as const;
 export type Gimmick = (typeof GIMMICKS)[number];
 
 export const GIMMICK_NAME: Record<Gimmick, string> = {
   mega: 'Mega Evolution',
   dynamax: 'Dynamax',
+  gigantamax: 'Gigantamax',
   zmove: 'Z-Move',
   tagMove: 'TAG Move',
   doubleMove: 'Double Move',
@@ -30,7 +31,10 @@ export type TagStats = {
 };
 
 export type Tag = {
-  id: string; // as printed, e.g. "1-3-002"
+  /** Unique app-wide. The printed code, except namespaced Regular Tags (see setInfo.ts). */
+  id: string;
+  /** Set only when the id differs from the code printed on the tag, e.g. "R-2-1". */
+  printedCode?: string;
   name: string;
   grade: Grade | null;
   types: PokemonType[]; // 1 or 2
