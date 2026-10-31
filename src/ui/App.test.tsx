@@ -107,7 +107,7 @@ it('shows a correction made in Collection on the Plan target chip', async () => 
   await screen.findByRole('heading', { level: 1, name: 'Play' });
   const tabs = within(screen.getByRole('navigation', { name: 'Main' }));
   await user.click(tabs.getByRole('button', { name: 'Plan' }));
-  await user.click(pane('Plan').getByRole('button', { name: 'Lugia Stardust V3' }));
+  await user.click(pane('Plan').getByRole('button', { name: 'Lugia 1-3-001' }));
   expect(pane('Plan').getByRole('button', { name: 'Clear Target' })).toHaveTextContent('1-3-001 6★');
 
   await correct(user, 'Lugia', 'Grade', '5★');

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { MY_TAGS, MY_TAGS_ID, SETS, isCustomId, isInSet, printedCode, setLabel, type AnySetId } from '../../data/setInfo';
+import { useEffect, useMemo, useState } from 'react';
+import { MY_TAGS_ID, isCustomId, printedCode, setLabel } from '../../data/setInfo';
 import { TAGS } from '../../data/tags';
 import type { Tag } from '../../data/types';
 import { gradeLabel, searchTags, typeLabel } from '../format';
+import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setChoices';
 import type { AppStore } from '../useAppData';
 import { CustomTagForm } from './CustomTagForm';
 import { TagEditor } from './TagEditor';
@@ -14,14 +15,6 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'missing', label: 'Missing' },
 ];
 
-type SetChoice = AnySetId | 'all';
-const DEFAULT_SET: SetChoice = 'stardust-v3';
-const SET_CHOICES: { id: SetChoice; label: string }[] = [
-  { id: 'all', label: 'All sets' },
-  ...SETS.map((s) => ({ id: s.id as SetChoice, label: s.name })),
-  { id: MY_TAGS_ID, label: MY_TAGS.name },
-];
-
 export function CollectionScreen({ store }: { store: AppStore }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -29,7 +22,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [returnFocusId, setReturnFocusId] = useState<string | null>(null);
-  const owned = new Set(store.data.owned);
+  const owned = useMemo(() => new Set(store.data.owned), [store.data.owned]);
   const editing = store.tags.find((t) => t.id === editingId);
 
   // Back on the list, put focus on the row that was being edited.
@@ -113,8 +106,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
     );
   }
 
-  const inSet = (t: Tag) => setChoice === 'all' || isInSet(t, setChoice);
-  const inScope = store.tags.filter(inSet);
+  const inScope = store.tags.filter((t) => inSetChoice(t, setChoice));
   const ownedInScope = inScope.filter((t) => owned.has(t.id)).length;
   const isShown = (t: Tag) => filter === 'all' || (filter === 'owned') === owned.has(t.id);
   // Two tags can share name, printed code and set (custom tags): number the later ones so each row is distinct.
@@ -183,7 +175,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               >
                 {isOwned ? '✓' : ''}
               </button>
-              {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt="" width={44} height={44} />}
+              {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt="" width={44} height={44} loading="lazy" decoding="async" />}
               <button type="button" className="tag-row" data-row-id={t.id} onClick={() => setEditingId(t.id)}>
                 <strong>{labelOf(t)}</strong> <small>{`${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
               </button>

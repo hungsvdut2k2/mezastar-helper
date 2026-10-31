@@ -3,8 +3,9 @@ import type { Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import { unknownOpponent } from '../../engine/recommend';
 import { Recommendations } from '../components/Recommendations';
-import { setLabel } from '../../data/setInfo';
+import { printedCode } from '../../data/setInfo';
 import { TagPicker } from '../components/TagPicker';
+import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setChoices';
 import type { AppStore } from '../useAppData';
 
 export function PlanScreen({ store }: { store: AppStore }) {
@@ -24,7 +25,8 @@ export function PlanScreen({ store }: { store: AppStore }) {
     () => store.tags.filter((t) => store.data.owned.includes(t.id)),
     [store.tags, store.data.owned],
   );
-  const superstars = store.tags.filter((t) => t.grade === 6);
+  const [setChoice, setSetChoice] = useState<SetChoice>(DEFAULT_SET);
+  const superstars = store.tags.filter((t) => t.grade === 6 && inSetChoice(t, setChoice));
   const battle = useMemo<Battle | null>(
     () =>
       target
@@ -41,13 +43,26 @@ export function PlanScreen({ store }: { store: AppStore }) {
       <h1>Plan</h1>
       <p className="hint">Pick the Pokémon you want to catch. The plan assumes it appears as the Boss.</p>
       {!target && (
-        <div className="chips">
-          {superstars.map((t) => (
-            <button key={t.id} type="button" onClick={() => setTarget(t)}>
-              {t.name} <small>{setLabel(t)}</small>
-            </button>
-          ))}
-        </div>
+        <>
+          <label>
+            Set
+            <select value={setChoice} onChange={(e) => setSetChoice(e.target.value as SetChoice)}>
+              {SET_CHOICES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="chips">
+            {superstars.map((t) => (
+              <button key={t.id} type="button" onClick={() => setTarget(t)}>
+                {t.name} <small>{printedCode(t)}</small>
+              </button>
+            ))}
+          </div>
+          {superstars.length === 0 && <p className="hint">No Superstars in this set. Search below instead.</p>}
+        </>
       )}
       <TagPicker label="Target" tags={store.tags} value={target} onChange={setTarget} />
       <TagPicker label="Crony 1 (optional)" tags={store.tags} value={crony1} onChange={setCrony1} />

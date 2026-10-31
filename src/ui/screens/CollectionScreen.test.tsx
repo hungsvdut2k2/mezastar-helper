@@ -230,6 +230,8 @@ it('shows a thumbnail in the list for tags with a photo, and offers Add photo in
   await waitFor(() => expect(document.querySelectorAll('img.tag-thumb')).toHaveLength(1));
   // Decorative: the row's own text already names the tag.
   expect(document.querySelector('img.tag-thumb')).toHaveAttribute('alt', '');
+  expect(document.querySelector('img.tag-thumb')).toHaveAttribute('loading', 'lazy');
+  expect(document.querySelector('img.tag-thumb')).toHaveAttribute('decoding', 'async');
   expect(screen.queryByRole('img')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
   expect(screen.getByLabelText('Change photo')).toBeInTheDocument();
