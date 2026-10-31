@@ -15,8 +15,8 @@
 [hidden] { display: none !important; }
 body { margin: 0; }
 .app { min-height: 100dvh; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-main { padding: 16px; padding-top: calc(16px + env(safe-area-inset-top)); max-width: 640px; margin: 0 auto; }
-h1 { font-size: 1.5rem; margin: 0 0 12px; }
+main { padding: 16px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left)); padding-top: calc(16px + env(safe-area-inset-top)); max-width: 640px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 12px; scroll-margin-top: 96px; }
 h2 { font-size: 1.1rem; margin: 20px 0 8px; }
 button, input, select, textarea { font: inherit; }
 button { min-height: 44px; min-width: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: #f9fafb; }
@@ -75,7 +75,7 @@ summary { cursor: pointer; min-height: 44px; display: flex; align-items: center;
 .question { margin: 12px 0; }
 .saved { color: var(--ok); }
 .sources { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
-.tabbar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: white; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: white; border-top: 1px solid var(--line); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .tabbar button { flex: 1; min-width: 0; border: none; border-radius: 0; background: none; min-height: 56px; padding: 8px 2px; font-size: 0.85rem; }
 .tabbar button[aria-current='page'] { color: var(--navy); font-weight: 700; box-shadow: inset 0 3px 0 var(--navy); }
 .picker-status { margin: 4px 0 0; }
