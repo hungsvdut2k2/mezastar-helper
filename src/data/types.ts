@@ -4,7 +4,7 @@ export const POKEMON_TYPES = [
 ] as const;
 export type PokemonType = (typeof POKEMON_TYPES)[number];
 
-export type Grade = 2 | 3 | 4 | 5 | 6; // 5 = Star, 6 = Superstar
+export type Grade = 1 | 2 | 3 | 4 | 5 | 6; // 5 = Star, 6 = Superstar; 1 only occurs on player-added tags
 
 export const GIMMICKS = ['mega', 'dynamax', 'gigantamax', 'zmove', 'tagMove', 'doubleMove', 'chainAttack'] as const;
 export type Gimmick = (typeof GIMMICKS)[number];

@@ -1,4 +1,6 @@
-import { POKEMON_TYPES, type PlayLogEntry, type PokemonType, type TagCorrection } from '../data/types';
+import { CUSTOM_ID_PATTERN, CUSTOM_SOURCE, MAX_CODE_LENGTH, MAX_MOVE_LENGTH, MAX_NAME_LENGTH } from '../data/customTag';
+import { isCustomId } from '../data/setInfo';
+import { GIMMICKS, POKEMON_TYPES, type Gimmick, type Grade, type PlayLogEntry, type PokemonType, type Tag, type TagCorrection } from '../data/types';
 import { TAGS } from '../data/tags';
 import { replaceAll, type AppData } from './db';
 
@@ -116,6 +118,37 @@ function isLogEntry(v: unknown): v is PlayLogEntry {
   );
 }
 
+const isText = (max: number) => (v: unknown): v is string => isString(v) && v.trim().length > 0 && v.length <= max;
+const distinctTypes = (t: unknown, max: number): t is PokemonType[] =>
+  Array.isArray(t) && t.length >= 1 && t.length <= max && t.every(isType) && new Set(t).size === t.length;
+
+/** A clean Tag built from a backup entry, or null if anything about it is off. Unknown keys are dropped. */
+function parseCustomTag(v: unknown): Tag | null {
+  if (!isObject(v)) return null;
+  const { id, printedCode, name, grade, types, move, gimmick, legendary, mythical } = v;
+  if (!isString(id) || !CUSTOM_ID_PATTERN.test(id)) return null;
+  if (!isText(MAX_CODE_LENGTH)(printedCode) || !isText(MAX_NAME_LENGTH)(name)) return null;
+  if (!(grade === null || (Number.isInteger(grade) && (grade as number) >= 1 && (grade as number) <= 6))) return null;
+  if (!distinctTypes(types, 2)) return null;
+  if (!(move === null || (isObject(move) && isText(MAX_MOVE_LENGTH)(move.name) && isType(move.type)))) return null;
+  if (!(gimmick === null || (isObject(gimmick) && isOneOf(GIMMICKS)(gimmick.kind)))) return null;
+  if (!isBool(legendary) || !isBool(mythical)) return null;
+  return {
+    id,
+    printedCode,
+    name,
+    grade: grade as Grade | null,
+    types,
+    pokenergy: null,
+    stats: { hp: null, attack: null, defense: null, speed: null },
+    move: move === null ? null : { name: (move as { name: string }).name, type: (move as { type: PokemonType }).type },
+    gimmick: gimmick === null ? null : { kind: (gimmick as { kind: Gimmick }).kind, moveName: null, moveType: null },
+    legendary,
+    mythical,
+    sources: [CUSTOM_SOURCE],
+  };
+}
+
 const damaged = (part: string): ParseResult => ({ ok: false, error: `The backup's ${part} section is damaged.` });
 
 export function parseBackup(text: string): ParseResult {
@@ -138,10 +171,24 @@ export function parseBackup(text: string): ParseResult {
   if (!Array.isArray(log) || !log.every(isLogEntry) || new Set(log.map((e) => e.id)).size !== log.length) {
     return damaged('play log');
   }
+  const customTags: Tag[] = [];
+  if (raw.customTags !== undefined) {
+    if (!Array.isArray(raw.customTags)) return damaged('custom tags');
+    for (const entry of raw.customTags) {
+      const tag = parseCustomTag(entry);
+      if (!tag || customTags.some((t) => t.id === tag.id)) return damaged('custom tags');
+      customTags.push(tag);
+    }
+  }
+  // Data about a player-added tag only makes sense when that tag is in the backup too.
+  const customIds = new Set(customTags.map((t) => t.id));
+  const known = new Set([...TAGS.map((t) => t.id), ...customIds]);
+  const refersToMissingCustom = (ids: string[]) => ids.some((id) => isCustomId(id) && !customIds.has(id));
+  if (refersToMissingCustom(owned)) return damaged('owned tags');
+  if (refersToMissingCustom(Object.keys(corrections))) return damaged('corrections');
   const photos: Record<string, Blob> = {};
   if (raw.photos !== undefined) {
     if (!isObject(raw.photos)) return damaged('photos');
-    const known = new Set(TAGS.map((t) => t.id));
     for (const [id, url] of Object.entries(raw.photos)) {
       const blob = known.has(id) ? dataUrlToBlob(url) : null;
       if (!blob) return damaged('photos');
@@ -156,6 +203,7 @@ export function parseBackup(text: string): ParseResult {
       corrections: corrections as Record<string, TagCorrection>,
       notes: notes as Record<string, string>,
       log: [...log].sort((a, b) => b.date.localeCompare(a.date)),
+      customTags: customTags.sort((a, b) => a.id.localeCompare(b.id)),
     },
   };
 }

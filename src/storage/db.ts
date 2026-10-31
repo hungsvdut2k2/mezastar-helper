@@ -1,11 +1,13 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { PlayLogEntry, TagCorrection } from '../data/types';
+import type { PlayLogEntry, Tag, TagCorrection } from '../data/types';
 
 export type AppData = {
   owned: string[];
   corrections: Record<string, TagCorrection>;
   notes: Record<string, string>;
   log: PlayLogEntry[];
+  /** Tags the player added (ids start with "my-"). */
+  customTags: Tag[];
 };
 
 interface HelperDB extends DBSchema {
@@ -14,6 +16,7 @@ interface HelperDB extends DBSchema {
   notes: { key: string; value: string };
   log: { key: string; value: PlayLogEntry };
   photos: { key: string; value: PhotoRecord };
+  customTags: { key: string; value: Tag };
 }
 
 /** Photos are stored as plain bytes, not Blobs: older WebKit versions mishandle Blobs in IndexedDB. */
@@ -52,6 +55,7 @@ function getDb() {
         }
         if (oldVersion < 2) {
           db.createObjectStore('photos');
+          db.createObjectStore('customTags', { keyPath: 'id' });
         }
       },
       // An old tab keeps the previous version open, so our upgrade has to wait for it.
@@ -88,19 +92,21 @@ function zip<V>(keys: string[], values: V[]): Record<string, V> {
 
 export async function loadAll(): Promise<AppData> {
   const db = await getDb();
-  const [owned, correctionIds, corrections, noteIds, notes, log] = await Promise.all([
+  const [owned, correctionIds, corrections, noteIds, notes, log, customTags] = await Promise.all([
     db.getAllKeys('owned'),
     db.getAllKeys('corrections'),
     db.getAll('corrections'),
     db.getAllKeys('notes'),
     db.getAll('notes'),
     db.getAll('log'),
+    db.getAll('customTags'),
   ]);
   return {
     owned,
     corrections: zip(correctionIds, corrections),
     notes: zip(noteIds, notes),
     log: log.sort((a, b) => b.date.localeCompare(a.date)),
+    customTags: customTags.sort((a, b) => a.id.localeCompare(b.id)),
   };
 }
 
@@ -120,6 +126,24 @@ export async function putPhoto(id: string, blob: Blob) {
 export async function deletePhoto(id: string) {
   const db = await getDb();
   await db.delete('photos', id);
+}
+
+export async function putCustomTag(tag: Tag) {
+  const db = await getDb();
+  await db.put('customTags', tag);
+}
+
+/** Remove a custom tag together with its owned flag, correction and photo, in one transaction. */
+export async function deleteCustomTag(id: string) {
+  const db = await getDb();
+  const tx = db.transaction(['customTags', 'owned', 'corrections', 'photos'], 'readwrite');
+  await Promise.all([
+    tx.objectStore('customTags').delete(id),
+    tx.objectStore('owned').delete(id),
+    tx.objectStore('corrections').delete(id),
+    tx.objectStore('photos').delete(id),
+    tx.done,
+  ]);
 }
 
 export async function setOwned(tagId: string, owned: boolean) {
@@ -154,20 +178,22 @@ export async function replaceAll(data: AppData, photos: Record<string, Blob> = {
   // Read the bytes first: a transaction closes if we wait on anything else while it is open.
   const records = await Promise.all(Object.entries(photos).map(async ([id, blob]) => [id, await toRecord(blob)] as const));
   const db = await getDb();
-  const tx = db.transaction(['owned', 'corrections', 'notes', 'log', 'photos'], 'readwrite');
+  const tx = db.transaction(['owned', 'corrections', 'notes', 'log', 'photos', 'customTags'], 'readwrite');
   const owned = tx.objectStore('owned');
   const corrections = tx.objectStore('corrections');
   const notes = tx.objectStore('notes');
   const log = tx.objectStore('log');
   const photoStore = tx.objectStore('photos');
+  const customStore = tx.objectStore('customTags');
   const pending: Promise<unknown>[] = [tx.done];
   try {
     // Requests run in order inside the transaction, so clear-then-put needs no waiting in between.
-    pending.push(owned.clear(), corrections.clear(), notes.clear(), log.clear(), photoStore.clear());
+    pending.push(owned.clear(), corrections.clear(), notes.clear(), log.clear(), photoStore.clear(), customStore.clear());
     for (const id of data.owned) pending.push(owned.put(true, id));
     for (const [id, c] of Object.entries(data.corrections)) pending.push(corrections.put(c, id));
     for (const [id, text] of Object.entries(data.notes)) pending.push(notes.put(text, id));
     for (const entry of data.log) pending.push(log.put(entry));
+    for (const tag of data.customTags) pending.push(customStore.put(tag));
     for (const [id, record] of records) pending.push(photoStore.put(record, id));
     await Promise.all(pending);
   } catch (err) {

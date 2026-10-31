@@ -75,6 +75,7 @@ describe('restore', () => {
         corrections: {},
         notes: {},
         log: [makeLogEntry({ id: 'x' }), makeLogEntry({ id: 'y', date: '2026-09-01T12:00:00.000Z' })],
+        customTags: [],
       },
       new Date(2026, 8, 5, 12),
     );
@@ -103,7 +104,7 @@ describe('restore', () => {
     vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['a']), '1-3-002': new Blob(['b']) });
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
     const backup = makeBackup(
-      { owned: [], corrections: {}, notes: {}, log: [] },
+      { owned: [], corrections: {}, notes: {}, log: [], customTags: [] },
       new Date(2026, 8, 5, 12),
       { '1-3-003': `data:image/png;base64,${btoa('hello')}` },
     );

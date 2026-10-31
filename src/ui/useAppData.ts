@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TAGS } from '../data/tags';
-import type { PlayLogEntry, TagCorrection } from '../data/types';
+import type { PlayLogEntry, Tag, TagCorrection } from '../data/types';
+import { playsUsingTag } from '../engine/customTags';
 import { applyCorrections } from '../engine/corrections';
 import { blobToDataUrl, restoreFromText, type ParseResult } from '../storage/backup';
 import * as db from '../storage/db';
 import type { AppData } from '../storage/db';
 
 const BLOCKED_MESSAGE = 'Close other Mezastar Helper tabs, then reopen the app.';
-const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [] };
+const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
 
 type Pending = { newest: number; inflight: number; saved: PlayLogEntry | undefined };
 type Rollback = {
@@ -67,7 +68,10 @@ export function useAppData() {
     };
   }, []);
 
-  const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
+  const tags = useMemo(
+    () => applyCorrections([...TAGS, ...data.customTags], data.corrections),
+    [data.customTags, data.corrections],
+  );
 
   // Per key with a rollback: the newest write, how many are still saving, and the last value known to be in storage.
   // An old failure never undoes a newer attempt; a failed newest write goes back to what is actually stored.
@@ -154,6 +158,42 @@ export function useAppData() {
       const blobs = await db.getAllPhotos();
       const entries = await Promise.all(Object.entries(blobs).map(async ([id, b]) => [id, await blobToDataUrl(b)] as const));
       return Object.fromEntries(entries);
+    },
+    /** Add or replace a player-made tag. Shown only once it is stored, so a failed save leaves no ghost tag. */
+    async saveCustomTag(tag: Tag): Promise<boolean> {
+      try {
+        await db.putCustomTag(tag);
+      } catch {
+        setError('Your tag was not saved.');
+        return false;
+      }
+      setData({
+        ...latest.current,
+        customTags: [...latest.current.customTags.filter((t) => t.id !== tag.id), tag].sort((a, b) => a.id.localeCompare(b.id)),
+      });
+      return true;
+    },
+    /** Delete a player-made tag with its owned flag, correction and photo. Refused while a saved play uses it. */
+    async deleteCustomTag(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+      const plays = playsUsingTag(latest.current.log, id);
+      if (plays > 0) return { ok: false, message: `Used in ${plays} saved ${plays === 1 ? 'play' : 'plays'} — can't delete.` };
+      try {
+        await db.deleteCustomTag(id);
+      } catch {
+        setError('Your tag was not deleted.');
+        return { ok: false, message: 'Could not delete this tag.' };
+      }
+      const d = latest.current;
+      const corrections = { ...d.corrections };
+      delete corrections[id];
+      setData({ ...d, customTags: d.customTags.filter((t) => t.id !== id), owned: d.owned.filter((o) => o !== id), corrections });
+      const url = photoUrls.current.get(id);
+      if (url) {
+        URL.revokeObjectURL(url);
+        photoUrls.current.delete(id);
+        if (alive.current) syncPhotos();
+      }
+      return { ok: true };
     },
     toggleOwned(tagId: string) {
       const nowOwned = !latest.current.owned.includes(tagId);

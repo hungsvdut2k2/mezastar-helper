@@ -1,7 +1,7 @@
 import { freshDb } from '../test/freshDb';
 import { makeLogEntry } from '../test/factories';
 import { blobToDataUrl, dataUrlToBlob, MAX_PHOTO_BYTES, makeBackup, parseBackup, restoreFromText } from './backup';
-import { addLogEntry, loadAll, saveCorrection, saveNote, setOwned } from './db';
+import { addLogEntry, getAllPhotos, loadAll, saveCorrection, saveNote, setOwned } from './db';
 
 beforeEach(freshDb);
 
@@ -21,7 +21,7 @@ describe('backup', () => {
   });
 
   it('stamps the app name, version and date', () => {
-    const backup = makeBackup({ owned: [], corrections: {}, notes: {}, log: [] }, new Date('2026-10-31T00:00:00Z'));
+    const backup = makeBackup({ owned: [], corrections: {}, notes: {}, log: [], customTags: [] }, new Date('2026-10-31T00:00:00Z'));
     expect(backup).toMatchObject({ app: 'mezastar-helper', version: 1, exportedAt: '2026-10-31T00:00:00.000Z' });
   });
 
@@ -122,7 +122,7 @@ describe('backup', () => {
   });
 
   describe('photos', () => {
-    const base = { app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [] };
+    const base = { app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
     const png = `data:image/png;base64,${btoa('hello')}`;
     const withPhotos = (photos: unknown) => JSON.stringify({ ...base, photos });
 
@@ -162,7 +162,7 @@ describe('backup', () => {
     });
 
     it('omits the photos field when there are none, and includes it otherwise', () => {
-      const empty = { owned: [], corrections: {}, notes: {}, log: [] };
+      const empty = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
       expect(makeBackup(empty)).not.toHaveProperty('photos');
       expect(makeBackup(empty, new Date(), { '1-3-001': png }).photos).toEqual({ '1-3-001': png });
     });
@@ -172,5 +172,96 @@ describe('backup', () => {
       expect(url).toBe(png);
       expect(dataUrlToBlob(url)?.size).toBe(5);
     });
+  });
+});
+
+describe('custom tags in backups', () => {
+  const custom = (over: Record<string, unknown> = {}) => ({
+    id: 'my-abc-1',
+    printedCode: 'X-9',
+    name: 'Homebrew',
+    grade: 3,
+    types: ['fire', 'water'],
+    pokenergy: null,
+    stats: { hp: null, attack: null, defense: null, speed: null },
+    move: { name: 'Zap', type: 'electric' },
+    gimmick: { kind: 'mega', moveName: null, moveType: null },
+    legendary: false,
+    mythical: true,
+    sources: ['added by you'],
+    ...over,
+  });
+  const wrap = (parts: Record<string, unknown>) =>
+    JSON.stringify({ app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], ...parts });
+  const png = `data:image/png;base64,${btoa('hello')}`;
+
+  it('round-trips a custom tag with its owned flag, correction and photo', async () => {
+    const tag = custom();
+    const blob = new Blob(['hello'], { type: 'image/png' });
+    const data = { owned: ['my-abc-1'], corrections: { 'my-abc-1': { stats: { attack: 5 } } }, notes: {}, log: [], customTags: [tag as never] };
+    const text = JSON.stringify(makeBackup(data, new Date(), { 'my-abc-1': await blobToDataUrl(blob) }));
+    freshDb();
+    const result = await restoreFromText(text);
+    expect(result.ok).toBe(true);
+    expect(await loadAll()).toEqual(data);
+    expect(Object.keys(await getAllPhotos())).toEqual(['my-abc-1']);
+  });
+
+  it('restores old backups without customTags as having none', () => {
+    const result = parseBackup(wrap({}));
+    expect(result.ok && result.data.customTags).toEqual([]);
+  });
+
+  it('accepts owned, corrections and photos for a custom id that is in the backup', () => {
+    const result = parseBackup(
+      wrap({ customTags: [custom()], owned: ['my-abc-1'], corrections: { 'my-abc-1': {} }, photos: { 'my-abc-1': png } }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ['owned', { owned: ['my-ghost'] }, 'owned tags'],
+    ['corrections', { corrections: { 'my-ghost': {} } }, 'corrections'],
+    ['photos', { photos: { 'my-ghost': png } }, 'photos'],
+  ])('rejects %s for a custom id missing from the backup', (_n, parts, message) => {
+    const result = parseBackup(wrap(parts));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain(message);
+  });
+
+  it.each([
+    ['an id without the prefix', { id: '1-3-001' }],
+    ['an id with odd characters', { id: 'my-a b' }],
+    ['a missing code', { printedCode: '  ' }],
+    ['a code that is too long', { printedCode: 'x'.repeat(21) }],
+    ['a name that is too long', { name: 'x'.repeat(61) }],
+    ['a missing name', { name: undefined }],
+    ['grade 0', { grade: 0 }],
+    ['grade 7', { grade: 7 }],
+    ['a fractional grade', { grade: 2.5 }],
+    ['no types', { types: [] }],
+    ['three types', { types: ['fire', 'water', 'grass'] }],
+    ['repeated types', { types: ['fire', 'fire'] }],
+    ['an unknown type', { types: ['sound'] }],
+    ['a bad move type', { move: { name: 'Zap', type: 'sound' } }],
+    ['a long move name', { move: { name: 'x'.repeat(61), type: 'fire' } }],
+    ['an unknown gimmick', { gimmick: { kind: 'tera' } }],
+    ['a non-boolean flag', { legendary: 'yes' }],
+  ])('rejects a custom tag with %s', (_n, over) => {
+    const result = parseBackup(wrap({ customTags: [custom(over)] }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('custom tags');
+  });
+
+  it('accepts grade 1 and null, and rejects duplicate ids and non-arrays', () => {
+    expect(parseBackup(wrap({ customTags: [custom({ grade: 1 }), custom({ id: 'my-2', grade: null })] })).ok).toBe(true);
+    expect(parseBackup(wrap({ customTags: [custom(), custom()] })).ok).toBe(false);
+    expect(parseBackup(wrap({ customTags: {} })).ok).toBe(false);
+  });
+
+  it('drops unknown keys from a custom tag', () => {
+    const result = parseBackup(wrap({ customTags: [custom({ evil: '<script>', stats: { hp: 99 } })] }));
+    expect(result.ok && result.data.customTags[0]).not.toHaveProperty('evil');
+    expect(result.ok && result.data.customTags[0].stats.hp).toBeNull();
   });
 });

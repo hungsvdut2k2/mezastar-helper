@@ -4,8 +4,12 @@ export type SetId =
   | 'stardust-v1' | 'stardust-v2' | 'stardust-v3' | 'stardust-v4'
   | 'galaxy-v1' | 'galaxy-v2' | 'galaxy-v3';
 
+/** Pseudo-set for tags the player added themselves. Not part of SETS (the official list). */
+export const MY_TAGS_ID = 'my-tags';
+export type AnySetId = SetId | typeof MY_TAGS_ID;
+
 export type TagSet = {
-  id: SetId;
+  id: AnySetId;
   name: string;
   /** Official Asia-English tag list for the set. */
   url: string;
@@ -26,7 +30,14 @@ export const SETS: TagSet[] = [
   { id: 'galaxy-v3', name: 'Galaxy V3', url: `${BASE}39325/`, prefix: '2-3' },
 ];
 
-export function setById(id: SetId): TagSet {
+export const MY_TAGS: TagSet = { id: MY_TAGS_ID, name: 'My tags', url: '', prefix: 'my' };
+
+/** Ids of player-added tags always start with this, so they can never equal a shipped id (those start with a digit or "R-"). */
+export const CUSTOM_ID_PREFIX = 'my-';
+export const isCustomId = (id: string) => id.startsWith(CUSTOM_ID_PREFIX);
+
+export function setById(id: AnySetId): TagSet {
+  if (id === MY_TAGS_ID) return MY_TAGS;
   const set = SETS.find((s) => s.id === id);
   if (!set) throw new Error(`Unknown set ${id}`);
   return set;
@@ -45,6 +56,7 @@ export function regularTagId(set: TagSet, n: number): string {
 
 /** The set a tag id belongs to, derived from its prefix. */
 export function setOfTagId(id: string): TagSet | undefined {
+  if (isCustomId(id)) return MY_TAGS;
   if (/^R-1-\d+$/.test(id)) return setById('stardust-v3');
   const prefix = /^(\d-\d)-/.exec(id)?.[1];
   return SETS.find((s) => s.prefix === prefix);

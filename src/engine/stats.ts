@@ -20,7 +20,7 @@ export type PlayStats = {
   predictions: { checked: number; correct: number; rate: number | null };
 };
 
-const GRADE_ORDER = ['6★', '5★', '4★', '3★', '2★', 'Unknown'];
+const GRADE_ORDER = ['6★', '5★', '4★', '3★', '2★', '1★', 'Unknown'];
 
 /** Rate of plays where the player caught the Pokémon they were aiming for. */
 function rate(entries: PlayLogEntry[]): Rate {

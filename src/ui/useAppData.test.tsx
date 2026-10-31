@@ -1,8 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as dbModule from '../storage/db';
-import { loadAll, setOwned } from '../storage/db';
-import { makeLogEntry } from '../test/factories';
+import { TAGS } from '../data/tags';
+import { addLogEntry, getAllPhotos, loadAll, putCustomTag, putPhoto, saveCorrection, setOwned } from '../storage/db';
+import { makeLogEntry, makeTag } from '../test/factories';
 import { freshDb } from '../test/freshDb';
 import { openDB } from 'idb';
 import { WithStore } from './testHarness';
@@ -11,18 +12,86 @@ import { useAppData } from './useAppData';
 beforeEach(freshDb);
 afterEach(() => vi.restoreAllMocks());
 
-it('loads saved data and applies corrections to tags', async () => {
+it('loads saved data and applies corrections to every shipped tag', async () => {
   await setOwned('1-3-001', true);
+  await saveCorrection('1-2-001', { stats: { attack: 321 } });
   render(
     <WithStore>
       {(store) => (
         <p>
-          {store.data.owned.join(',')} {store.tags.length}
+          {store.data.owned.join(',')} total={store.tags.length} attack={store.tags.find((t) => t.id === '1-2-001')?.stats.attack}
         </p>
       )}
     </WithStore>,
   );
-  expect(await screen.findByText('1-3-001 73')).toBeInTheDocument();
+  expect(await screen.findByText(`1-3-001 total=${TAGS.length} attack=321`)).toBeInTheDocument();
+  expect(TAGS.length).toBe(508);
+});
+
+it('merges custom tags into store.tags, and refuses to delete one used in a saved play', async () => {
+  const user = userEvent.setup();
+  const tag = makeTag('my-1', { name: 'Homebrew', printedCode: 'X-1' });
+  await putCustomTag(tag);
+  await setOwned('my-1', true);
+  await addLogEntry(makeLogEntry({ id: 'p1', teamUsed: ['my-1'] }));
+  await addLogEntry(makeLogEntry({ id: 'p2', target: 'my-1' }));
+  let outcome = '';
+  render(
+    <WithStore>
+      {(store) => (
+        <>
+          <p>{`total=${store.tags.length} custom=${store.tags.some((t) => t.id === 'my-1')}`}</p>
+          <button type="button" onClick={async () => { const r = await store.deleteCustomTag('my-1'); outcome = r.ok ? 'ok' : r.message; }}>
+            delete
+          </button>
+        </>
+      )}
+    </WithStore>,
+  );
+  expect(await screen.findByText(`total=${TAGS.length + 1} custom=true`)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'delete' }));
+  await waitFor(() => expect(outcome).toBe("Used in 2 saved plays — can't delete."));
+  expect((await loadAll()).customTags).toHaveLength(1);
+  expect((await loadAll()).owned).toEqual(['my-1']);
+});
+
+it('deletes an unused custom tag with its owned flag, correction and photo', async () => {
+  const user = userEvent.setup();
+  await putCustomTag(makeTag('my-1'));
+  await setOwned('my-1', true);
+  await saveCorrection('my-1', { grade: 3 });
+  await putPhoto('my-1', new Blob(['x'], { type: 'image/png' }));
+  render(
+    <WithStore>
+      {(store) => (
+        <button type="button" onClick={() => store.deleteCustomTag('my-1')}>
+          {`delete (${store.tags.length}, ${store.photos.size})`}
+        </button>
+      )}
+    </WithStore>,
+  );
+  await user.click(await screen.findByRole('button', { name: `delete (${TAGS.length + 1}, 1)` }));
+  await screen.findByRole('button', { name: `delete (${TAGS.length}, 0)` });
+  expect(await loadAll()).toMatchObject({ customTags: [], owned: [], corrections: {} });
+  expect(await getAllPhotos()).toEqual({});
+});
+
+it('does not show a custom tag whose save failed', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(dbModule, 'putCustomTag').mockRejectedValueOnce(new Error('full'));
+  render(
+    <WithStore>
+      {(store) => (
+        <>
+          <button type="button" onClick={() => store.saveCustomTag(makeTag('my-1'))}>{`add (${store.tags.length})`}</button>
+          <p>{store.error ?? 'no error'}</p>
+        </>
+      )}
+    </WithStore>,
+  );
+  await user.click(await screen.findByRole('button', { name: `add (${TAGS.length})` }));
+  expect(await screen.findByText('Your tag was not saved.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: `add (${TAGS.length})` })).toBeInTheDocument();
 });
 
 it('saves a toggle to storage', async () => {
