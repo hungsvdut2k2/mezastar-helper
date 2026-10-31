@@ -22,9 +22,24 @@ export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const PHOTO_PREFIX = /^data:image\/(jpeg|png|webp);base64,/;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
+/** Keeps entries for shipped tags and for player-added tags that exist; drops references to missing ones. */
+function onlyExistingTags<V>(record: Record<string, V>, customIds: Set<string>): Record<string, V> {
+  return Object.fromEntries(Object.entries(record).filter(([id]) => !isCustomId(id) || customIds.has(id)));
+}
+
+/** Never writes orphans: owned flags, corrections and photos of a missing player-added tag are left out. */
 export function makeBackup(data: AppData, now = new Date(), photos: Record<string, string> = {}): Backup {
-  const backup: Backup = { app: 'mezastar-helper', version: BACKUP_VERSION, exportedAt: now.toISOString(), ...data };
-  if (Object.keys(photos).length > 0) backup.photos = photos;
+  const customIds = new Set(data.customTags.map((t) => t.id));
+  const backup: Backup = {
+    app: 'mezastar-helper',
+    version: BACKUP_VERSION,
+    exportedAt: now.toISOString(),
+    ...data,
+    owned: data.owned.filter((id) => !isCustomId(id) || customIds.has(id)),
+    corrections: onlyExistingTags(data.corrections, customIds),
+  };
+  const keptPhotos = onlyExistingTags(photos, customIds);
+  if (Object.keys(keptPhotos).length > 0) backup.photos = keptPhotos;
   return backup;
 }
 
@@ -181,12 +196,13 @@ export function parseBackup(text: string): ParseResult {
       customTags.push(tag);
     }
   }
-  // Data about a player-added tag only makes sense when that tag is in the backup too.
+  // An owned flag, correction or photo for a player-added tag that is not in the backup has nothing to
+  // attach to: drop it quietly instead of rejecting the file. A saved play needs its tags, so those are checked.
   const customIds = new Set(customTags.map((t) => t.id));
   const known = new Set([...TAGS.map((t) => t.id), ...customIds]);
-  const refersToMissingCustom = (ids: string[]) => ids.some((id) => isCustomId(id) && !customIds.has(id));
-  if (refersToMissingCustom(owned)) return damaged('owned tags');
-  if (refersToMissingCustom(Object.keys(corrections))) return damaged('corrections');
+  const isOrphan = (id: string) => isCustomId(id) && !customIds.has(id);
+  const keptOwned = owned.filter((id) => !isOrphan(id));
+  const keptCorrections = Object.fromEntries(Object.entries(corrections).filter(([id]) => !isOrphan(id)));
   for (const entry of log) {
     const missing = tagIdsInPlay(entry).find((id) => isCustomId(id) && !customIds.has(id));
     if (missing) return { ok: false, error: `A saved play uses a tag you added (${missing}) that is not in the backup.` };
@@ -195,6 +211,7 @@ export function parseBackup(text: string): ParseResult {
   if (raw.photos !== undefined) {
     if (!isObject(raw.photos)) return damaged('photos');
     for (const [id, url] of Object.entries(raw.photos)) {
+      if (isOrphan(id)) continue;
       const blob = known.has(id) ? dataUrlToBlob(url) : null;
       if (!blob) return damaged('photos');
       photos[id] = blob;
@@ -204,8 +221,8 @@ export function parseBackup(text: string): ParseResult {
     ok: true,
     photos,
     data: {
-      owned,
-      corrections: corrections as Record<string, TagCorrection>,
+      owned: keptOwned,
+      corrections: keptCorrections as Record<string, TagCorrection>,
       notes: notes as Record<string, string>,
       log: [...log].sort((a, b) => b.date.localeCompare(a.date)),
       customTags: customTags.sort((a, b) => a.id.localeCompare(b.id)),

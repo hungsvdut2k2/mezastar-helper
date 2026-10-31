@@ -219,14 +219,39 @@ describe('custom tags in backups', () => {
     expect(result.ok).toBe(true);
   });
 
-  it.each([
-    ['owned', { owned: ['my-ghost'] }, 'owned tags'],
-    ['corrections', { corrections: { 'my-ghost': {} } }, 'corrections'],
-    ['photos', { photos: { 'my-ghost': png } }, 'photos'],
-  ])('rejects %s for a custom id missing from the backup', (_n, parts, message) => {
-    const result = parseBackup(wrap(parts));
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain(message);
+  it('drops owned flags, corrections and photos of a custom id missing from the backup, without rejecting', () => {
+    const result = parseBackup(
+      wrap({
+        customTags: [custom()],
+        owned: ['my-ghost', 'my-abc-1', '1-3-001'],
+        corrections: { 'my-ghost': { grade: 5 }, 'my-abc-1': {}, '1-3-001': { grade: 6 } },
+        photos: { 'my-ghost': png, 'my-abc-1': png, '1-3-001': png },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.owned).toEqual(['my-abc-1', '1-3-001']);
+    expect(Object.keys(result.data.corrections).sort()).toEqual(['1-3-001', 'my-abc-1']);
+    expect(Object.keys(result.photos).sort()).toEqual(['1-3-001', 'my-abc-1']);
+  });
+
+  it('still rejects a malformed photo for a tag that exists', () => {
+    expect(parseBackup(wrap({ photos: { '1-3-001': 'data:text/html;base64,AAAA' } })).ok).toBe(false);
+  });
+
+  it('never exports orphans: owned, corrections and photos of missing custom tags are filtered', () => {
+    const data = {
+      owned: ['my-ghost', '1-3-001'],
+      corrections: { 'my-ghost': { grade: 5 as const }, '1-3-001': { grade: 6 as const } },
+      notes: {},
+      log: [],
+      customTags: [],
+    };
+    const backup = makeBackup(data, new Date(), { 'my-ghost': png, '1-3-001': png });
+    expect(backup.owned).toEqual(['1-3-001']);
+    expect(Object.keys(backup.corrections)).toEqual(['1-3-001']);
+    expect(Object.keys(backup.photos ?? {})).toEqual(['1-3-001']);
+    expect(makeBackup(data, new Date(), { 'my-ghost': png })).not.toHaveProperty('photos');
   });
 
   it.each([

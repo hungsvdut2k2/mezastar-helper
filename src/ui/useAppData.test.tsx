@@ -55,6 +55,33 @@ it('merges custom tags into store.tags, and refuses to delete one used in a save
   expect((await loadAll()).owned).toEqual(['my-1']);
 });
 
+it('does not leave an owned flag behind when a toggle lands right after the tag was deleted', async () => {
+  const user = userEvent.setup();
+  await putCustomTag(makeTag('my-1'));
+  let done: Promise<unknown> = Promise.resolve();
+  render(
+    <WithStore>
+      {(store) => (
+        <button
+          type="button"
+          onClick={() => {
+            done = Promise.all([store.deleteCustomTag('my-1'), store.toggleOwned('my-1')]);
+          }}
+        >
+          race ({store.tags.length})
+        </button>
+      )}
+    </WithStore>,
+  );
+  await user.click(await screen.findByRole('button', { name: `race (${TAGS.length + 1})` }));
+  await act(async () => {
+    await done;
+  });
+  const data = await loadAll();
+  expect(data.customTags).toEqual([]);
+  expect(data.owned).toEqual([]);
+});
+
 it('deletes an unused custom tag with its owned flag, correction and photo', async () => {
   const user = userEvent.setup();
   await putCustomTag(makeTag('my-1'));

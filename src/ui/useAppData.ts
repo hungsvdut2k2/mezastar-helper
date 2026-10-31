@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isCustomId } from '../data/setInfo';
 import { TAGS } from '../data/tags';
 import type { PlayLogEntry, Tag, TagCorrection } from '../data/types';
 import { playsUsingTag } from '../engine/customTags';
@@ -215,7 +216,13 @@ export function useAppData() {
           ...d,
           owned: nowOwned ? [...d.owned.filter((id) => id !== tagId), tagId] : d.owned.filter((id) => id !== tagId),
         }),
-        () => db.setOwned(tagId, nowOwned),
+        // Queued behind custom-tag deletes: a toggle that lands after its tag was deleted must not
+        // leave an owned flag for a tag that no longer exists.
+        () =>
+          enqueue(async () => {
+            if (isCustomId(tagId) && !latest.current.customTags.some((t) => t.id === tagId)) return;
+            await db.setOwned(tagId, nowOwned);
+          }),
       );
     },
     saveCorrection(tagId: string, correction: TagCorrection | null) {
