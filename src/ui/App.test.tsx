@@ -65,7 +65,8 @@ async function pick(user: ReturnType<typeof userEvent.setup>, screenName: string
 async function correct(user: ReturnType<typeof userEvent.setup>, name: string, field: string, value: string) {
   const tabs = within(screen.getByRole('navigation', { name: 'Main' }));
   await user.click(tabs.getByRole('button', { name: 'Collection' }));
-  await user.click(pane('Collection').getByText(name));
+  // Stardust V3 is listed first, so the first match is the V3 tag.
+  await user.click(pane('Collection').getAllByText(name)[0]);
   const input = screen.getByLabelText(field);
   if (input.tagName === 'SELECT') await user.selectOptions(input, value);
   else {
@@ -106,7 +107,7 @@ it('shows a correction made in Collection on the Plan target chip', async () => 
   await screen.findByRole('heading', { level: 1, name: 'Play' });
   const tabs = within(screen.getByRole('navigation', { name: 'Main' }));
   await user.click(tabs.getByRole('button', { name: 'Plan' }));
-  await user.click(pane('Plan').getByRole('button', { name: 'Lugia' }));
+  await user.click(pane('Plan').getByRole('button', { name: 'Lugia Stardust V3' }));
   expect(pane('Plan').getByRole('button', { name: 'Clear Target' })).toHaveTextContent('1-3-001 6★');
 
   await correct(user, 'Lugia', 'Grade', '5★');

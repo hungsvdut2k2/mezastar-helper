@@ -17,7 +17,7 @@ export const percent = (rate: number | null) => (rate === null ? '—' : `${Math
 export function searchTags(tags: Tag[], query: string): Tag[] {
   const q = query.trim().toLowerCase();
   if (!q) return tags;
-  return tags.filter((t) => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q));
+  return tags.filter((t) => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q) || (t.printedCode?.toLowerCase().includes(q) ?? false));
 }
 
 const two = (n: number) => String(n).padStart(2, '0');

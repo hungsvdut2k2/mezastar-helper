@@ -33,7 +33,7 @@ it('announces only a short results count, not the whole button list', async () =
   expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
   await user.type(screen.getByLabelText('Boss'), 'Lugia');
   expect(live).toHaveTextContent(/^\d+ match(es)?$/);
-  expect(live).not.toContainElement(screen.getByRole('button', { name: /^Lugia/ }));
+  expect(live).not.toContainElement(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
   await user.clear(screen.getByLabelText('Boss'));
   await user.type(screen.getByLabelText('Boss'), 'zzzzqq');
   expect(live).toHaveTextContent('No matching tag');
