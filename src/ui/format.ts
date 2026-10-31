@@ -30,8 +30,12 @@ export function localDate(when: Date | string): string {
 
 const SLOT_NAMES = ['Boss', 'Crony 1', 'Crony 2'];
 
-/** Opponent names for buttons. If two share a name, every label gets its slot, e.g. "Crony 1: Pidgeot". */
-export function opponentLabels(opponents: Tag[]): string[] {
-  const duplicated = new Set(opponents.map((o) => o.name)).size < opponents.length;
-  return opponents.map((o, i) => (duplicated ? `${SLOT_NAMES[i]}: ${o.name}` : o.name));
+/**
+ * Opponent names for buttons. If two share a name, every label gets its slot, e.g. "Crony 1: Pidgeot".
+ * An empty slot reads "Crony 1 (needs opponent)".
+ */
+export function opponentLabels(opponents: (Tag | null)[]): string[] {
+  const names = opponents.flatMap((o) => (o ? [o.name] : []));
+  const duplicated = new Set(names).size < names.length;
+  return opponents.map((o, i) => (!o ? `${SLOT_NAMES[i]} (needs opponent)` : duplicated ? `${SLOT_NAMES[i]}: ${o.name}` : o.name));
 }

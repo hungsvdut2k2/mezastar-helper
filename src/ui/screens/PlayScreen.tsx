@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { PlayMode, Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import type { Recommendation } from '../../engine/recommend';
+import { opponentLabels } from '../format';
+import { useFocusHeading } from '../useFocusHeading';
 import { Recommendations } from '../components/Recommendations';
 import { TagPicker } from '../components/TagPicker';
 import type { AppStore } from '../useAppData';
@@ -26,6 +28,8 @@ export function PlayScreen({ store }: { store: AppStore }) {
     [store.tags, store.data.owned],
   );
   const [boss, crony1, crony2] = picked;
+  const headingRef = useFocusHeading(saved);
+  const labels = opponentLabels(picked);
   const battle = useMemo<Battle | null>(
     () => (boss && crony1 && crony2 ? { opponents: [boss, crony1, crony2], targetIndex } : null),
     [boss, crony1, crony2, targetIndex],
@@ -33,7 +37,6 @@ export function PlayScreen({ store }: { store: AppStore }) {
 
   const pick = (slot: number) => (tag: Tag | null) => {
     setPicked((p) => p.map((x, i) => (i === slot ? tag : x)));
-    if (tag === null && slot === targetIndex) setTargetIndex(0);
     setSaved(false);
   };
 
@@ -58,9 +61,15 @@ export function PlayScreen({ store }: { store: AppStore }) {
 
   return (
     <section>
-      <h1>Play</h1>
-      {saved && <p className="notice">Play saved. Good luck on the next one!</p>}
-      <div className="segmented">
+      <h1 ref={headingRef} tabIndex={-1}>
+        Play
+      </h1>
+      {saved && (
+        <p className="notice" role="status">
+          Play saved. Good luck on the next one!
+        </p>
+      )}
+      <div className="segmented" role="group" aria-label="Play mode">
         {MODES.map((m) => (
           <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => setMode(m.id)}>
             {m.label}
@@ -74,24 +83,27 @@ export function PlayScreen({ store }: { store: AppStore }) {
       {SLOTS.map((label, i) => (
         <TagPicker key={label} label={label} tags={store.tags} value={picked[i]} onChange={pick(i)} />
       ))}
-      {battle && (
+      {picked.some(Boolean) && (
         <>
-          <h2>Which one do you want to catch?</h2>
-          <div className="segmented">
-            {battle.opponents.map((o, i) => (
+          <h2 id="play-target">Which one do you want to catch?</h2>
+          <div className="segmented" role="group" aria-labelledby="play-target">
+            {SLOTS.map((slot, i) => (
               <button
-                key={i}
+                key={slot}
                 type="button"
                 aria-pressed={targetIndex === i}
                 onClick={() => setTargetIndex(i as 0 | 1 | 2)}
               >
-                {o.name}
+                {labels[i]}
               </button>
             ))}
           </div>
-          <Recommendations owned={owned} battle={battle} onUseTeam={setLogging} />
+          {!picked[targetIndex] && (
+            <p className="hint">{`Your target is ${SLOTS[targetIndex]}. Enter that opponent to get a plan.`}</p>
+          )}
         </>
       )}
+      {battle && <Recommendations owned={owned} battle={battle} onUseTeam={setLogging} />}
     </section>
   );
 }

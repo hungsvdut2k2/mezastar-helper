@@ -62,3 +62,43 @@ it('does not say Play saved when saving failed', async () => {
   expect(screen.getByRole('button', { name: 'Save play' })).toBeEnabled();
   vi.restoreAllMocks();
 });
+
+it('names its button rows as groups', async () => {
+  await enterBattle();
+  expect(screen.getByRole('group', { name: 'Play mode' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Which one do you want to catch?' })).toBeInTheDocument();
+});
+
+it('keeps the target on a cleared slot instead of switching to the Boss', async () => {
+  const user = await enterBattle();
+  await user.click(screen.getByRole('button', { name: 'Pidgeot' }));
+  await user.click(screen.getByRole('button', { name: 'Clear Crony 1' }));
+  expect(screen.getByRole('button', { name: 'Crony 1 (needs opponent)' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText(/Your target is Crony 1/)).toBeInTheDocument();
+  await user.type(screen.getByLabelText('Crony 1'), 'Pidgeot');
+  await user.click(screen.getByRole('button', { name: /^Pidgeot 1-3-017/ }));
+  expect(screen.getByRole('button', { name: 'Pidgeot' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('labels buttons by slot when two opponents share a name', async () => {
+  const user = userEvent.setup();
+  render(<WithStore>{(store) => <PlayScreen store={store} />}</WithStore>);
+  for (const [slot, query, id] of [
+    ['Boss', 'Lugia', '1-3-001'],
+    ['Crony 1', 'Pidgeot', '1-3-017'],
+    ['Crony 2', 'Pidgeot', '1-3-017'],
+  ]) {
+    await user.type(await screen.findByLabelText(slot), query);
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${query} ${id}`) }));
+  }
+  expect(screen.getByRole('button', { name: 'Crony 1: Pidgeot' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Crony 2: Pidgeot' })).toBeInTheDocument();
+});
+
+it('announces Play saved as a status and focuses the heading', async () => {
+  const user = await enterBattle();
+  await user.click(screen.getByRole('button', { name: 'I used this team — log the play' }));
+  await user.click(screen.getByRole('button', { name: 'Save play' }));
+  expect(await screen.findByRole('status')).toHaveTextContent(/Play saved/);
+  expect(screen.getByRole('heading', { name: 'Play' })).toHaveFocus();
+});

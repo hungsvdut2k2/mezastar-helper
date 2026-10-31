@@ -22,3 +22,7 @@ describe('opponentLabels', () => {
     expect(opponentLabels([byId('1-3-001'), p, p])).toEqual(['Boss: Lugia', 'Crony 1: Pidgeot', 'Crony 2: Pidgeot']);
   });
 });
+
+it('labels an empty opponent slot as needing an opponent', () => {
+  expect(opponentLabels([byId('1-3-001'), null, null])).toEqual(['Lugia', 'Crony 1 (needs opponent)', 'Crony 2 (needs opponent)']);
+});
