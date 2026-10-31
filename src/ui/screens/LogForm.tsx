@@ -22,6 +22,8 @@ const BALLS: { id: BallType; label: string }[] = [
   { id: 'master', label: 'Master' },
 ];
 
+const MAX_TURNS = 3;
+
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: Props) {
@@ -38,6 +40,8 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
   const [turnState, setTurnState] = useState(() =>
     steps.map((s) => ({ attacker: s.tagId, aim: s.aimAtIndex as number, defeated: false })),
   );
+  const addTurn = () =>
+    setTurnState((all) => [...all, { attacker: rec.team[0].id, aim: battle.targetIndex as number, defeated: false }]);
   const changeTurn = (i: number, patch: Partial<(typeof turnState)[number]>) =>
     setTurnState((all) => all.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   const labels = opponentLabels(battle.opponents);
@@ -76,15 +80,15 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
       superstarAppeared: battle.opponents.some((o) => o.grade === 6),
       teamUsed: rec.team.map((t) => t.id),
       turns: withTurns
-        ? steps.map((s, i) => {
-            const aimedAt = battle.opponents[turnState[i].aim].id;
+        ? turnState.map((t, i) => {
+            const s = steps[i];
+            const aimedAt = battle.opponents[t.aim].id;
             return {
-              attacker: turnState[i].attacker,
+              attacker: t.attacker,
               aimedAt,
-              defeated: turnState[i].defeated ? aimedAt : undefined,
-              // The plan only predicted this for its own attacker and aim.
-              predictedDefeat:
-                turnState[i].attacker === s.tagId && turnState[i].aim === s.aimAtIndex ? (s.expectDefeat ?? undefined) : undefined,
+              defeated: t.defeated ? aimedAt : undefined,
+              // The plan only predicted this for its own attacker and aim; turns beyond the plan have no prediction.
+              predictedDefeat: s && t.attacker === s.tagId && t.aim === s.aimAtIndex ? (s.expectDefeat ?? undefined) : undefined,
             };
           })
         : [],
@@ -155,11 +159,11 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
       {withTurns && (
         <>
           <ol className="turns">
-            {steps.map((s, i) => (
-              <li key={s.turn}>
-                <strong>{`Turn ${s.turn}`}</strong>
+            {turnState.map((_, i) => (
+              <li key={i}>
+                <strong>{`Turn ${i + 1}`}</strong>
                 <label>
-                  {`Turn ${s.turn} attacker`}
+                  {`Turn ${i + 1} attacker`}
                   <select value={turnState[i].attacker} onChange={(e) => changeTurn(i, { attacker: e.target.value })}>
                     {rec.team.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -169,7 +173,7 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
                   </select>
                 </label>
                 <label>
-                  {`Turn ${s.turn} aimed at`}
+                  {`Turn ${i + 1} aimed at`}
                   <select value={turnState[i].aim} onChange={(e) => changeTurn(i, { aim: Number(e.target.value) })}>
                     {battle.opponents.map((o, k) => (
                       <option key={k} value={k}>
@@ -185,6 +189,11 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
               </li>
             ))}
           </ol>
+          {turnState.length < MAX_TURNS && (
+            <button type="button" onClick={addTurn}>
+              Add turn
+            </button>
+          )}
           {cronyDefeatTicked && cronyDefeated === 0 && (
             <p className="notice" role="status">
               You ticked a crony as defeated in the turn detail, but "Cronies defeated" is 0. You can still save.

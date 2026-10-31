@@ -81,6 +81,25 @@ describe('turn detail', () => {
     return onSave;
   };
 
+  it('lets the player log up to 3 turns even when the plan was shorter', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn<(e: PlayLogEntry) => void>();
+    const shortRec = { ...rec, plan: { ...rec.plan!, steps: rec.plan!.steps.slice(0, 1) } };
+    render(<LogForm mode="battle" battle={battle} rec={shortRec} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+    await user.click(screen.getByRole('checkbox', { name: 'Add turn detail' }));
+    expect(screen.queryByLabelText('Turn 2 attacker')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add turn' }));
+    await user.click(screen.getByRole('button', { name: 'Add turn' }));
+    expect(screen.queryByRole('button', { name: 'Add turn' })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Turn 3 aimed at'), '1');
+    await user.click(screen.getByRole('button', { name: 'Save play' }));
+    const turns = onSave.mock.calls[0][0].turns;
+    expect(turns).toHaveLength(3);
+    expect(turns[2].aimedAt).toBe('1-3-017');
+    expect(turns[1].predictedDefeat).toBeUndefined();
+    expect(turns[2].predictedDefeat).toBeUndefined();
+  });
+
   it('lets the player change the attacker and the aim of a turn', async () => {
     const user = userEvent.setup();
     const onSave = setup();
