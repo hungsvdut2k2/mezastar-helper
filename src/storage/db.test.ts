@@ -67,42 +67,42 @@ describe('storage', () => {
   });
 
   const bytesOf = (b: Blob) =>
-  new Promise<number[]>((resolve) => {
-    const r = new FileReader();
-    r.onload = () => resolve([...new Uint8Array(r.result as ArrayBuffer)]);
-    r.readAsArrayBuffer(b);
+    new Promise<number[]>((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve([...new Uint8Array(r.result as ArrayBuffer)]);
+      r.readAsArrayBuffer(b);
+    });
+
+  it('keeps photo bytes and type through put/get and replaceAll', async () => {
+    await putPhoto('a', new Blob([new Uint8Array([1, 2, 3, 255])], { type: 'image/jpeg' }));
+    const a = (await getAllPhotos()).a;
+    expect(a.type).toBe('image/jpeg');
+    expect(await bytesOf(a)).toEqual([1, 2, 3, 255]);
+    const empty = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
+    await replaceAll(empty, { b: new Blob([new Uint8Array([9, 8])], { type: 'image/png' }) });
+    const photos = await getAllPhotos();
+    expect(Object.keys(photos)).toEqual(['b']);
+    expect(photos.b.type).toBe('image/png');
+    expect(await bytesOf(photos.b)).toEqual([9, 8]);
   });
 
-it('keeps photo bytes and type through put/get and replaceAll', async () => {
-  await putPhoto('a', new Blob([new Uint8Array([1, 2, 3, 255])], { type: 'image/jpeg' }));
-  const a = (await getAllPhotos()).a;
-  expect(a.type).toBe('image/jpeg');
-  expect(await bytesOf(a)).toEqual([1, 2, 3, 255]);
-  const empty = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
-  await replaceAll(empty, { b: new Blob([new Uint8Array([9, 8])], { type: 'image/png' }) });
-  const photos = await getAllPhotos();
-  expect(Object.keys(photos)).toEqual(['b']);
-  expect(photos.b.type).toBe('image/png');
-  expect(await bytesOf(photos.b)).toEqual([9, 8]);
-});
-
-it('reports when an old connection blocks the upgrade, then finishes once it closes', async () => {
-  const v1 = await openDB('mezastar-helper', 1, {
-    upgrade(db) {
-      db.createObjectStore('owned');
-      db.createObjectStore('corrections');
-      db.createObjectStore('notes');
-      db.createObjectStore('log', { keyPath: 'id' });
-    },
+  it('reports when an old connection blocks the upgrade, then finishes once it closes', async () => {
+    const v1 = await openDB('mezastar-helper', 1, {
+      upgrade(db) {
+        db.createObjectStore('owned');
+        db.createObjectStore('corrections');
+        db.createObjectStore('notes');
+        db.createObjectStore('log', { keyPath: 'id' });
+      },
+    });
+    const blocked = vi.fn();
+    const off = onDbBlocked(blocked);
+    const loading = loadAll();
+    await vi.waitFor(() => expect(blocked).toHaveBeenCalled());
+    v1.close();
+    expect((await loading).owned).toEqual([]);
+    off();
   });
-  const blocked = vi.fn();
-  const off = onDbBlocked(blocked);
-  const loading = loadAll();
-  await vi.waitFor(() => expect(blocked).toHaveBeenCalled());
-  v1.close();
-  expect((await loading).owned).toEqual([]);
-  off();
-});
 
 it('replaceAll replaces photos too, and a failure keeps the old photos', async () => {
     await putPhoto('old', new Blob(['1']));
