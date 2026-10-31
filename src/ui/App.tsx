@@ -51,7 +51,7 @@ export function App() {
         <div className="topbar-inner">
           <StarBadge className="logo" />
           <p className="brand">
-            MEZASTAR <b>HELPER</b>
+            <span className="brand-1">MEZASTAR</span> <span className="brand-2">HELPER</span>
           </p>
           {MACHINE_SET && (
             <span className="machine-chip">

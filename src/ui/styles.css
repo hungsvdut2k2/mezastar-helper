@@ -163,10 +163,11 @@ details[open] > summary::before { transform: rotate(90deg); }
   background: linear-gradient(180deg, #a3122a, var(--red-deep));
   border-bottom: 3px solid var(--gold);
 }
-.logo { width: 38px; height: 38px; flex: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35)); }
-.brand { flex: 1; min-width: 0; margin: 0; font-weight: 900; font-style: italic; letter-spacing: 0.06em; font-size: clamp(0.9rem, 4.6vw, 1.2rem); color: #ffffff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand b { color: var(--gold); font-weight: 900; }
-.machine-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: var(--gold); color: #2a1a00; font-weight: 900; font-size: 0.78rem; white-space: nowrap; box-shadow: 0 2px 0 var(--gold-deep); }
+.logo { width: 34px; height: 34px; flex: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35)); }
+.brand { flex: 1; min-width: 0; margin: 0; font-weight: 900; font-style: italic; line-height: 1.05; color: #ffffff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); overflow-wrap: anywhere; }
+.brand-1 { display: block; font-size: clamp(0.95rem, 4.8vw, 1.25rem); letter-spacing: 0.04em; }
+.brand-2 { display: block; font-size: 0.72rem; letter-spacing: 0.32em; color: var(--gold); }
+.machine-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: var(--gold); color: #2a1a00; font-weight: 900; font-size: 0.72rem; white-space: nowrap; box-shadow: 0 2px 0 var(--gold-deep); }
 
 /* ===== tab bar ===== */
 .tabbar {
