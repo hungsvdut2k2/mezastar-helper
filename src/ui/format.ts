@@ -9,6 +9,7 @@ export const TRUST_LABEL: Record<Trust, string> = {
   player: 'Seen by you',
   community: 'Community tip',
   open: 'Open question',
+  estimate: 'Estimate',
 };
 
 export const percent = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`);

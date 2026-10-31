@@ -18,7 +18,8 @@ export const GIMMICK_NAME: Record<Gimmick, string> = {
   chainAttack: 'Chain Attack',
 };
 
-export const TRUST_LEVELS = ['confirmed', 'community', 'player', 'open'] as const;
+/** 'estimate' is for the app's own model predictions; it is not a source for mechanics. */
+export const TRUST_LEVELS = ['confirmed', 'community', 'player', 'open', 'estimate'] as const;
 export type Trust = (typeof TRUST_LEVELS)[number];
 
 export type TagStats = {

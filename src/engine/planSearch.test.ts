@@ -94,7 +94,7 @@ describe('bestPlan', () => {
     const battle = battleOf(opp('boss', { types: ['rock'] }), opp('c1', { stats: { hp: 40 } }), opp('c2', { stats: { hp: 40 } }));
     const plan = bestPlan(team, battle)!;
     for (const s of plan.steps.filter((x) => x.expectDefeat)) {
-      expect(s.trust).not.toBe('confirmed');
+      expect(s.trust).toBe('estimate');
       expect(s.why).toContain('estimate');
     }
   });

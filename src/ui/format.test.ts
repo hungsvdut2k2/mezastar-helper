@@ -1,5 +1,5 @@
 import { TAGS } from '../data/tags';
-import { localDate, opponentLabels } from './format';
+import { TRUST_LABEL, localDate, opponentLabels } from './format';
 
 const byId = (id: string) => TAGS.find((t) => t.id === id)!;
 
@@ -25,4 +25,11 @@ describe('opponentLabels', () => {
 
 it('labels an empty opponent slot as needing an opponent', () => {
   expect(opponentLabels([byId('1-3-001'), null, null])).toEqual(['Lugia', 'Crony 1 (needs opponent)', 'Crony 2 (needs opponent)']);
+});
+
+describe('TRUST_LABEL', () => {
+  it('labels model estimates separately from what the player saw', () => {
+    expect(TRUST_LABEL.estimate).toBe('Estimate');
+    expect(TRUST_LABEL.player).toBe('Seen by you');
+  });
 });

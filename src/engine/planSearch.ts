@@ -154,9 +154,8 @@ function searchedStep(team: Tag[], battle: Battle, o: TurnOutcome, index: number
   const aim = o.turn.aimAt;
   const opp = battle.opponents[aim];
   const isTarget = aim === battle.targetIndex;
-  // Relies on choosing which opponent to hit (seen by the player). Defeats are model
-  // predictions, so they say "model estimate" and are never marked Official.
-  const trust: Trust = 'player';
+  // Damage and defeats are the app's own model predictions: shown as an Estimate, never Official.
+  const trust: Trust = 'estimate';
   let why: string;
   if (o.defeated && aim === 0) {
     why = 'Expected to beat the Boss (model estimate), so Catch Time starts.';
