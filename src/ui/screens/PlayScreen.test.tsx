@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as dbModule from '../../storage/db';
 import { loadAll, setOwned } from '../../storage/db';
 import { freshDb } from '../../test/freshDb';
 import { WithStore } from '../testHarness';
 import { PlayScreen } from './PlayScreen';
 
 beforeEach(freshDb);
+afterEach(() => vi.restoreAllMocks());
 
 async function enterBattle() {
   for (const id of ['1-3-002', '1-3-008', '1-3-012']) await setOwned(id, true);
@@ -48,4 +50,15 @@ it('logs the play and saves it on the phone', async () => {
   const { log } = await loadAll();
   expect(log).toHaveLength(1);
   expect(log[0]).toMatchObject({ boss: '1-3-001', target: '1-3-001', caught: '1-3-001', bossDefeated: true });
+});
+
+it('does not say Play saved when saving failed', async () => {
+  const user = await enterBattle();
+  vi.spyOn(dbModule, 'addLogEntry').mockRejectedValue(new Error('disk full'));
+  await user.click(screen.getByRole('button', { name: 'I used this team — log the play' }));
+  await user.click(screen.getByRole('button', { name: 'Save play' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(/not saved/i);
+  expect(screen.queryByText(/Play saved/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save play' })).toBeEnabled();
+  vi.restoreAllMocks();
 });

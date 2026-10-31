@@ -46,7 +46,7 @@ export function PlayScreen({ store }: { store: AppStore }) {
         lastLocation={store.data.log[0]?.location ?? ''}
         onCancel={() => setLogging(null)}
         onSave={async (entry) => {
-          await store.addLog(entry);
+          if (!(await store.addLog(entry))) throw new Error('not saved');
           setLogging(null);
           setPicked([null, null, null]);
           setTargetIndex(0);

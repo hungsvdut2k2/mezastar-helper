@@ -40,3 +40,22 @@ it('builds a log entry from a few taps', async () => {
   expect(entry.turns[0].defeated).toBe(entry.turns[0].aimedAt);
   expect(entry.turns[1].defeated).toBeUndefined();
 });
+
+it('saves once even if Save play is tapped twice quickly', async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn<(e: PlayLogEntry) => Promise<void>>(() => new Promise((r) => setTimeout(r, 50)));
+  render(<LogForm mode="battle" battle={battle} rec={rec} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+  await user.dblClick(screen.getByRole('button', { name: 'Save play' }));
+  expect(onSave).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Save play' })).toBeDisabled();
+});
+
+it('keeps the same entry id when retrying after a failed save', async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn<(e: PlayLogEntry) => Promise<void>>().mockRejectedValueOnce(new Error('x')).mockResolvedValue();
+  render(<LogForm mode="battle" battle={battle} rec={rec} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+  await user.click(screen.getByRole('button', { name: 'Save play' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(/not saved/);
+  await user.click(screen.getByRole('button', { name: 'Save play' }));
+  expect(onSave.mock.calls[1][0].id).toBe(onSave.mock.calls[0][0].id);
+});

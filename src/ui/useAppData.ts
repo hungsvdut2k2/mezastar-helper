@@ -28,13 +28,15 @@ export function useAppData() {
 
   const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
 
-  /** Update the screen right away, then save; tell the player if saving failed. */
-  async function write(update: (d: AppData) => AppData, persist: () => Promise<void>) {
+  /** Update the screen right away, then save; tell the player if saving failed. Resolves to true only if saved. */
+  async function write(update: (d: AppData) => AppData, persist: () => Promise<void>): Promise<boolean> {
     setData(update(latest.current));
     try {
       await persist();
+      return true;
     } catch {
       setError('Your latest change was not saved.');
+      return false;
     }
   }
 
@@ -69,7 +71,7 @@ export function useAppData() {
       return write((d) => ({ ...d, notes: { ...d.notes, [id]: text } }), () => db.saveNote(id, text));
     },
     addLog(entry: PlayLogEntry) {
-      return write((d) => ({ ...d, log: [entry, ...d.log] }), () => db.addLogEntry(entry));
+      return write((d) => ({ ...d, log: [entry, ...d.log.filter((e) => e.id !== entry.id)] }), () => db.addLogEntry(entry));
     },
     deleteLog(id: string) {
       return write((d) => ({ ...d, log: d.log.filter((e) => e.id !== id) }), () => db.deleteLogEntry(id));

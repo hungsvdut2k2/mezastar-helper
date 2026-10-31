@@ -6,19 +6,28 @@ import type { AppStore } from '../useAppData';
 
 const ORDER: Trust[] = ['confirmed', 'player', 'community', 'open'];
 
+/** Short link text for a source; falls back to the raw text if it is not a valid URL. */
+export function sourceLabel(source: string): string {
+  try {
+    return new URL(source).pathname.split('/').pop() || source;
+  } catch {
+    return source;
+  }
+}
+
 function Source({ source }: { source: string }) {
   return source.startsWith('http') ? (
     <a href={source} target="_blank" rel="noreferrer">
-      {new URL(source).pathname.split('/').pop() || source}
+      {sourceLabel(source)}
     </a>
   ) : (
     <span>{source}</span>
   );
 }
 
-function AnswerField({ q, initial, onSave }: { q: OpenQuestion; initial: string; onSave: (text: string) => Promise<void> }) {
+function AnswerField({ q, initial, onSave }: { q: OpenQuestion; initial: string; onSave: (text: string) => Promise<boolean> }) {
   const [text, setText] = useState(initial);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<'saved' | 'failed' | null>(null);
   return (
     <div className="question">
       <label>
@@ -27,7 +36,7 @@ function AnswerField({ q, initial, onSave }: { q: OpenQuestion; initial: string;
           value={text}
           onChange={(e) => {
             setText(e.target.value);
-            setSaved(false);
+            setSaved(null);
           }}
         />
       </label>
@@ -36,13 +45,21 @@ function AnswerField({ q, initial, onSave }: { q: OpenQuestion; initial: string;
         <button
           type="button"
           onClick={async () => {
-            await onSave(text);
-            setSaved(true);
+            setSaved((await onSave(text)) ? 'saved' : 'failed');
           }}
         >
           Save answer
         </button>
-        {saved && <span className="saved">Saved</span>}
+        {saved === 'saved' && (
+          <span className="saved" role="status">
+            Saved
+          </span>
+        )}
+        {saved === 'failed' && (
+          <span className="error" role="alert">
+            Your answer was not saved.
+          </span>
+        )}
       </div>
     </div>
   );

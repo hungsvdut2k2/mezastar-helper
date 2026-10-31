@@ -78,3 +78,25 @@ it('never duplicates an id on fast double taps', async () => {
   await userEvent.setup().click(await screen.findByRole('button', { name: 'owned: none' }));
   expect(await screen.findByRole('button', { name: 'owned: 1-3-002' })).toBeInTheDocument();
 });
+
+it('reports whether a write was saved', async () => {
+  let result: { ok: boolean[] } = { ok: [] };
+  render(
+    <WithStore>
+      {(store) => (
+        <button
+          type="button"
+          onClick={async () => {
+            result.ok.push(await store.saveNote('lanes', 'a'));
+            vi.spyOn(dbModule, 'saveNote').mockRejectedValue(new Error('disk full'));
+            result.ok.push(await store.saveNote('lanes', 'b'));
+          }}
+        >
+          go
+        </button>
+      )}
+    </WithStore>,
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'go' }));
+  await vi.waitFor(() => expect(result.ok).toEqual([true, false]));
+});

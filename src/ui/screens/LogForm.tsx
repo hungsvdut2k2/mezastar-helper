@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { BallType, PlayLogEntry, PlayMode } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import type { Recommendation } from '../../engine/recommend';
@@ -8,7 +8,8 @@ type Props = {
   battle: Battle;
   rec: Recommendation;
   lastLocation: string;
-  onSave: (entry: PlayLogEntry) => void;
+  /** May return a promise; if it rejects, the form shows an error and lets the player try again. */
+  onSave: (entry: PlayLogEntry) => void | Promise<void>;
   onCancel: () => void;
 };
 
@@ -33,9 +34,29 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
   const [withTurns, setWithTurns] = useState(false);
   const [defeatedAt, setDefeatedAt] = useState<boolean[]>(steps.map(() => false));
 
-  function save() {
-    onSave({
-      id: newId(),
+  // One id per form, so a repeated tap can never create a second entry.
+  const [entryId] = useState(newId);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const busy = useRef(false);
+
+  async function save() {
+    if (busy.current) return;
+    busy.current = true;
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      await onSave(buildEntry());
+    } catch {
+      busy.current = false;
+      setSaving(false);
+      setSaveFailed(true);
+    }
+  }
+
+  function buildEntry(): PlayLogEntry {
+    return {
+      id: entryId,
       date: new Date().toISOString(),
       location: location.trim() || undefined,
       mode,
@@ -57,7 +78,7 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
       ballType: ball,
       caught: caughtIndex === null ? null : battle.opponents[caughtIndex].id,
       note: note.trim() || undefined,
-    });
+    };
   }
 
   return (
@@ -137,13 +158,18 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional" />
       </label>
       <div className="actions">
-        <button type="button" className="primary" onClick={save}>
+        <button type="button" className="primary" onClick={save} disabled={saving}>
           Save play
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
       </div>
+      {saveFailed && (
+        <p className="error" role="alert">
+          This play was not saved. Tap Save play to try again.
+        </p>
+      )}
     </section>
   );
 }
