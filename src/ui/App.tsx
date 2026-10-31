@@ -27,11 +27,7 @@ export function App() {
 
   // The panes share one page, so a new tab would otherwise open at the old scroll position.
   useEffect(() => {
-    try {
-      window.scrollTo(0, 0);
-    } catch {
-      // not implemented in every environment (e.g. jsdom)
-    }
+    window.scrollTo(0, 0);
   }, [tab]);
 
   return (

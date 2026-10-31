@@ -17,6 +17,17 @@ it('opens on Play and switches screens from the tab bar', async () => {
   }
 });
 
+it('scrolls to the top when the tab changes', async () => {
+  const user = userEvent.setup();
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Play' });
+  scrollTo.mockClear();
+  await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Guide' }));
+  expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  scrollTo.mockRestore();
+});
+
 it('keeps what was typed on Play when the player checks another tab', async () => {
   const user = userEvent.setup();
   render(<App />);
