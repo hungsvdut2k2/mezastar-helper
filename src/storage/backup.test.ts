@@ -1,3 +1,4 @@
+import { GIMMICK_NAME } from '../data/types';
 import { freshDb } from '../test/freshDb';
 import { makeLogEntry } from '../test/factories';
 import { blobToDataUrl, dataUrlToBlob, MAX_PHOTO_BYTES, makeBackup, parseBackup, restoreFromText } from './backup';
@@ -205,6 +206,15 @@ describe('custom tags in backups', () => {
     expect(result.ok).toBe(true);
     expect(await loadAll()).toEqual(data);
     expect(Object.keys(await getAllPhotos())).toEqual(['my-abc-1']);
+  });
+
+  it.each(Object.keys(GIMMICK_NAME))('round-trips a custom tag with a %s gimmick', async (kind) => {
+    const tag = custom({ gimmick: { kind, moveName: null, moveType: null } });
+    const data = { owned: [], corrections: {}, notes: {}, log: [], customTags: [tag as never] };
+    const text = JSON.stringify(makeBackup(data, new Date()));
+    freshDb();
+    expect((await restoreFromText(text)).ok).toBe(true);
+    expect((await loadAll()).customTags[0].gimmick).toEqual({ kind, moveName: null, moveType: null });
   });
 
   it('restores old backups without customTags as having none', () => {
