@@ -8,6 +8,17 @@ import type { AppData } from '../storage/db';
 
 const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [] };
 
+type Pending = { newest: number; inflight: number; saved: PlayLogEntry | undefined };
+type Rollback = {
+  key: string;
+  /** The value this write stores (undefined for a delete). */
+  value: PlayLogEntry | undefined;
+  /** The stored value as currently shown. */
+  stored: (d: AppData) => PlayLogEntry | undefined;
+  /** Put `saved` back (or remove the entry when undefined). */
+  restore: (d: AppData, saved: PlayLogEntry | undefined) => AppData;
+};
+
 export function useAppData() {
   const [data, setDataState] = useState<AppData>(EMPTY_DATA);
   // Always the newest data, so quick taps never work from a stale snapshot.
@@ -28,36 +39,42 @@ export function useAppData() {
 
   const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
 
-  // Per key: the newest write, and whether any write for it already reached storage.
-  // An old failure never undoes a newer attempt, and nothing is undone once the data is persisted.
-  const pending = useRef(new Map<string, { newest: number; persisted: boolean }>());
+  // Per key with a rollback: the newest write, how many are still saving, and the last value known to be in storage.
+  // An old failure never undoes a newer attempt; a failed newest write goes back to what is actually stored.
+  const pending = useRef(new Map<string, Pending>());
   const writeCounter = useRef(0);
 
   /**
    * Update the screen right away, then save; tell the player if saving failed. Resolves to true only if saved.
-   * With `rollback`, a failed save also takes the change back off the screen (unless a newer write for the same key
-   * exists, or an earlier write for it already saved).
+   * With `rollback`, a failed save also puts the last persisted value for that key back on screen (unless a newer
+   * write for the same key exists).
    */
   async function write(
     update: (d: AppData) => AppData,
     persist: () => Promise<void>,
-    rollback?: { key: string; undo: (d: AppData) => AppData },
+    rollback?: Rollback,
   ): Promise<boolean> {
     const mine = ++writeCounter.current;
-    const slot = rollback ? { newest: mine, persisted: pending.current.get(rollback.key)?.persisted ?? false } : null;
-    if (rollback && slot) pending.current.set(rollback.key, slot);
+    let slot: Pending | undefined;
+    if (rollback) {
+      slot = pending.current.get(rollback.key);
+      // With nothing in flight, what is on screen right now is what is stored.
+      if (!slot) slot = { newest: mine, inflight: 0, saved: rollback.stored(latest.current) };
+      slot.newest = mine;
+      slot.inflight++;
+      pending.current.set(rollback.key, slot);
+    }
     setData(update(latest.current));
     try {
       await persist();
-      if (rollback && pending.current.get(rollback.key) === slot && slot) slot.persisted = true;
+      if (rollback && slot) slot.saved = rollback.value;
       return true;
     } catch {
-      const current = rollback && pending.current.get(rollback.key);
-      if (rollback && current && current.newest === mine && !current.persisted) setData(rollback.undo(latest.current));
+      if (rollback && slot && slot.newest === mine) setData(rollback.restore(latest.current, slot.saved));
       setError('Your latest change was not saved.');
       return false;
     } finally {
-      if (rollback && pending.current.get(rollback.key)?.newest === mine) pending.current.delete(rollback.key);
+      if (rollback && slot && --slot.inflight === 0) pending.current.delete(rollback.key);
     }
   }
 
@@ -92,20 +109,19 @@ export function useAppData() {
       return write((d) => ({ ...d, notes: { ...d.notes, [id]: text } }), () => db.saveNote(id, text));
     },
     addLog(entry: PlayLogEntry) {
-      const prev = latest.current.log.find((e) => e.id === entry.id);
       return write(
         (d) => ({ ...d, log: [entry, ...d.log.filter((e) => e.id !== entry.id)] }),
         () => db.addLogEntry(entry),
         // An unsaved play must not look saved in Stats; the form keeps its data and can retry.
-        { key: `log:${entry.id}`, undo: (d) => ({
-            ...d,
-            log: prev ? d.log.map((e) => (e.id === entry.id ? prev : e)) : d.log.filter((e) => e.id !== entry.id),
-          }),
-        },
+        logRollback(entry.id, entry),
       );
     },
     deleteLog(id: string) {
-      return write((d) => ({ ...d, log: d.log.filter((e) => e.id !== id) }), () => db.deleteLogEntry(id));
+      return write(
+        (d) => ({ ...d, log: d.log.filter((e) => e.id !== id) }),
+        () => db.deleteLogEntry(id),
+        logRollback(id, undefined),
+      );
     },
     async restore(text: string): Promise<ParseResult> {
       try {
@@ -115,6 +131,20 @@ export function useAppData() {
       } catch {
         return { ok: false, error: 'Saving the restored data failed.' };
       }
+    },
+  };
+}
+
+function logRollback(id: string, value: PlayLogEntry | undefined): Rollback {
+  return {
+    key: `log:${id}`,
+    value,
+    stored: (d) => d.log.find((e) => e.id === id),
+    restore: (d, saved) => {
+      if (!saved) return { ...d, log: d.log.filter((e) => e.id !== id) };
+      return d.log.some((e) => e.id === id)
+        ? { ...d, log: d.log.map((e) => (e.id === id ? saved : e)) }
+        : { ...d, log: [saved, ...d.log] };
     },
   };
 }

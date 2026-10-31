@@ -161,7 +161,8 @@ describe('addLog when saving fails', () => {
   });
 
   it('keeps the entry when an older save succeeded and a newer one with the same id fails', async () => {
-    const e = makeLogEntry({ id: 'e3' });
+    const e = makeLogEntry({ id: 'e3', location: 'Tokyo' });
+    const retry = { ...e, location: 'Osaka' };
     let succeedFirst!: () => void;
     let failSecond!: () => void;
     vi.spyOn(dbModule, 'addLogEntry')
@@ -174,10 +175,10 @@ describe('addLog when saving fails', () => {
           <button
             type="button"
             onClick={() => {
-              results.push(store.addLog(e), store.addLog(e));
+              results.push(store.addLog(e), store.addLog(retry));
             }}
           >
-            {`log: ${store.data.log.map((l) => l.id).join(',') || 'none'}`}
+            {`log: ${store.data.log.map((l) => l.location).join(',') || 'none'}`}
           </button>
         )}
       </WithStore>,
@@ -191,8 +192,53 @@ describe('addLog when saving fails', () => {
       outcomes = await Promise.all(results);
     });
     expect(outcomes).toEqual([true, false]);
-    // The data is already stored, so the failed retry must not remove it from the screen.
-    expect(screen.getByRole('button', { name: 'log: e3' })).toBeInTheDocument();
+    // The first version is stored, so the failed newer one rolls back to it (not to nothing, not to the failed text).
+    expect(screen.getByRole('button', { name: 'log: Tokyo' })).toBeInTheDocument();
+  });
+
+  it('removes the entry when two concurrent saves with the same id both fail', async () => {
+    const e = makeLogEntry({ id: 'e5', location: 'Tokyo' });
+    vi.spyOn(dbModule, 'addLogEntry').mockRejectedValue(new Error('x'));
+    const results: Promise<boolean>[] = [];
+    render(
+      <WithStore>
+        {(store) => (
+          <button
+            type="button"
+            onClick={() => {
+              results.push(store.addLog(e), store.addLog({ ...e, location: 'Osaka' }));
+            }}
+          >
+            {`log: ${store.data.log.map((l) => l.location).join(',') || 'none'}`}
+          </button>
+        )}
+      </WithStore>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'log: none' }));
+    let outcomes: boolean[] = [];
+    await act(async () => {
+      outcomes = await Promise.all(results);
+    });
+    expect(outcomes).toEqual([false, false]);
+    expect(screen.getByRole('button', { name: 'log: none' })).toBeInTheDocument();
+  });
+
+  it('restores the removed entry when deleting fails', async () => {
+    const e = makeLogEntry({ id: 'e6', location: 'Kyoto' });
+    await dbModule.addLogEntry(e);
+    vi.spyOn(dbModule, 'deleteLogEntry').mockRejectedValue(new Error('x'));
+    render(
+      <WithStore>
+        {(store) => (
+          <button type="button" onClick={() => store.deleteLog('e6')}>
+            {`log: ${store.data.log.map((l) => l.location).join(',') || 'none'}`}
+          </button>
+        )}
+      </WithStore>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'log: Kyoto' }));
+    await waitFor(() => expect(vi.mocked(dbModule.deleteLogEntry)).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'log: Kyoto' })).toBeInTheDocument());
   });
 
   it('puts the previous version back when re-saving an existing entry fails', async () => {
