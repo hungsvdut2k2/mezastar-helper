@@ -20,7 +20,9 @@ export type PlayStats = {
   predictions: { checked: number; correct: number; rate: number | null };
 };
 
-const GRADE_ORDER = ['6★', '5★', '4★', '3★', '2★', '1★', 'Unknown'];
+/** Shown for targets whose grade is null: shipped 2–4★ tags (the page gives no per-tag grade) or a grade never set. */
+export const UNKNOWN_GRADE = 'Unknown grade (2–4★ or not set)';
+const GRADE_ORDER = ['6★', '5★', '4★', '3★', '2★', '1★', UNKNOWN_GRADE];
 
 /** Rate of plays where the player caught the Pokémon they were aiming for. */
 function rate(entries: PlayLogEntry[]): Rate {
@@ -43,7 +45,7 @@ export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
   const byGrade = new Map<string, PlayLogEntry[]>();
   for (const e of battles) {
     const g = gradeOf(e.target);
-    const key = g === null ? 'Unknown' : `${g}★`;
+    const key = g === null ? UNKNOWN_GRADE : `${g}★`;
     byGrade.set(key, [...(byGrade.get(key) ?? []), e]);
   }
 

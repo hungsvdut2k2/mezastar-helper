@@ -36,6 +36,11 @@ describe('computeStats', () => {
     ]);
   });
 
+  it('labels targets with no grade as "Unknown grade (2–4★ or not set)", after the numbered grades', () => {
+    const plain = computeStats([makeLogEntry({ target: '1-3-029' }), makeLogEntry({ target: '1-3-001' })], TAGS);
+    expect(plain.byTargetGrade.map((g) => g.grade)).toEqual(['6★', 'Unknown grade (2–4★ or not set)']);
+  });
+
   it('compares plays where a crony was defeated against plays where none was', () => {
     expect(s.cronyDefeated).toEqual({ count: 2, caught: 1, rate: 0.5 });
     expect(s.noCronyDefeated).toEqual({ count: 1, caught: 0, rate: 0 });
