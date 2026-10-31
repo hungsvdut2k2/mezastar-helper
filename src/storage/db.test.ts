@@ -104,7 +104,7 @@ describe('storage', () => {
     off();
   });
 
-it('replaceAll replaces photos too, and a failure keeps the old photos', async () => {
+  it('replaceAll replaces photos too, and a failure keeps the old photos', async () => {
     await putPhoto('old', new Blob(['1']));
     const empty = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
     await replaceAll(empty, { fresh: new Blob(['22']) });
