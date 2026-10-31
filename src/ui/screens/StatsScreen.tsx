@@ -68,7 +68,7 @@ export function StatsScreen({ store }: { store: AppStore }) {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setMessage({ kind: 'ok', text: 'Backup created.' });
+      setMessage({ kind: 'ok', text: 'Backup file offered for download. Check the Files app.' });
     } catch {
       setMessage({ kind: 'error', text: 'Could not create the backup.' });
     }

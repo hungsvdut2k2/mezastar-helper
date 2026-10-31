@@ -193,6 +193,7 @@ describe('backup', () => {
     expect(attached).toBe(true);
     expect(document.querySelector('a[download]')).toBeNull();
     expect(timers).toHaveBeenCalledWith(expect.any(Function), 60_000);
-    expect(await screen.findByRole('status')).toHaveTextContent('Backup created');
+    expect(await screen.findByRole('status')).toHaveTextContent('Backup file offered for download. Check the Files app.');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Backup created');
   });
 });
