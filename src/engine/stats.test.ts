@@ -12,7 +12,7 @@ const log = [
     turns: [{ attacker: '1-3-002', aimedAt: '1-3-017', predictedDefeat: true }],
   }),
   makeLogEntry({
-    id: 'c', target: '1-3-017', caught: '1-3-041', bossDefeated: true, cronyDefeatedCount: 1, superstarAppeared: false,
+    id: 'c', boss: '1-3-017', target: '1-3-017', caught: '1-3-041', bossDefeated: true, cronyDefeatedCount: 1,
   }),
 ];
 
@@ -50,6 +50,14 @@ describe('computeStats', () => {
 
   it('checks the model\'s one-hit predictions', () => {
     expect(s.predictions).toEqual({ checked: 2, correct: 1, rate: 0.5 });
+  });
+
+  it('keeps seen at or above caught when a grade is corrected after logging', () => {
+    const entry = makeLogEntry({ id: 'x', boss: '1-3-017', cronies: ['1-3-017', '1-3-017'], target: '1-3-017', caught: '1-3-017', superstarAppeared: false });
+    const corrected = TAGS.map((t) => (t.id === '1-3-017' ? { ...t, grade: 6 as const } : t));
+    const r = computeStats([entry], corrected);
+    expect(r.superstarsCaught).toBe(1);
+    expect(r.superstarsSeen).toBeGreaterThanOrEqual(r.superstarsCaught);
   });
 
   it('handles an empty log', () => {

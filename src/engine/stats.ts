@@ -31,6 +31,11 @@ function rate(entries: PlayLogEntry[]): Rate {
 export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
   const gradeOf = (id: string | null): Grade | null => tags.find((t) => t.id === id)?.grade ?? null;
 
+  // "Seen" and "caught" both use today's (corrected) grades, so a grade fix can never leave seen below caught.
+  // A Superstar was seen if any opponent of the play, the target or the caught Pokémon is a 6★ now.
+  const sawSuperstar = (e: PlayLogEntry) =>
+    [e.boss, ...e.cronies, e.target, e.caught].some((id) => gradeOf(id) === 6);
+
   // Battle comparisons (won/lost, crony defeated or not, target grade) skip "Catch now!"
   // plays: there is no battle, so they would all count as lost with no crony defeated.
   const battles = log.filter((e) => e.mode !== 'catchNow');
@@ -47,7 +52,7 @@ export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
     const key = e.location?.trim() || 'Unlabelled';
     const current = locations.get(key) ?? { plays: 0, superstarsSeen: 0 };
     current.plays += 1;
-    if (e.superstarAppeared) current.superstarsSeen += 1;
+    if (sawSuperstar(e)) current.superstarsSeen += 1;
     locations.set(key, current);
   }
 
@@ -65,7 +70,7 @@ export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
     whenLost: rate(battles.filter((e) => !e.bossDefeated)),
     catchNow: rate(log.filter((e) => e.mode === 'catchNow')),
     byTargetGrade: GRADE_ORDER.filter((g) => byGrade.has(g)).map((grade) => ({ grade, rate: rate(byGrade.get(grade)!) })),
-    superstarsSeen: log.filter((e) => e.superstarAppeared).length,
+    superstarsSeen: log.filter(sawSuperstar).length,
     superstarsCaught: log.filter((e) => gradeOf(e.caught) === 6).length,
     cronyDefeated: rate(battles.filter((e) => e.cronyDefeatedCount > 0)),
     noCronyDefeated: rate(battles.filter((e) => e.cronyDefeatedCount === 0)),
