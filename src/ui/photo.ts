@@ -13,6 +13,30 @@ export function fitWithin(width: number, height: number, max = PHOTO_MAX_SIDE): 
 /** Decodes an image and re-encodes it at the size `fit` picks. Replaceable in tests. */
 export type Rasterizer = (file: Blob, fit: typeof fitWithin) => Promise<Blob>;
 
+/** The parts of an image element that `whenDecoded` uses (so tests can pass a fake). */
+export type DecodableImage = Pick<HTMLImageElement, 'complete' | 'naturalWidth' | 'onload' | 'onerror'> & {
+  decode?: () => Promise<void>;
+};
+
+/**
+ * Resolves once the image can be drawn. decode() can reject on older WebKit (EncodingError) even for a valid
+ * large blob image, so on failure fall back to waiting for the normal load event before giving up.
+ */
+export async function whenDecoded(img: DecodableImage): Promise<void> {
+  try {
+    if (!img.decode) throw new Error('no decode');
+    await img.decode();
+    return;
+  } catch {
+    // fall through to the load events
+  }
+  await new Promise<void>((resolve, reject) => {
+    if (img.complete && img.naturalWidth > 0) return resolve();
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('image failed to load'));
+  });
+}
+
 /**
  * The browser implementation (canvas). Not available in jsdom: this path is verified on a device, not in tests.
  * Decoding goes through an <img> so iOS (13.4+) applies the EXIF orientation, and createImageBitmap is not required.
@@ -23,7 +47,7 @@ export const canvasRasterizer: Rasterizer = async (file, fit) => {
   try {
     const img = new Image();
     img.src = url;
-    await img.decode();
+    await whenDecoded(img);
     const { width, height } = fit(img.naturalWidth, img.naturalHeight);
     canvas = document.createElement('canvas');
     canvas.width = width;
