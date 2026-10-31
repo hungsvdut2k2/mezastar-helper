@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TAGS } from '../../data/tags';
 import type { PlayLogEntry } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
-import { recommend } from '../../engine/recommend';
+import { bestPlan } from '../../engine/planSearch';
+import { recommend, type Recommendation } from '../../engine/recommend';
+import { makeTag } from '../../test/factories';
 import { LogForm } from './LogForm';
 
 const byId = (id: string) => TAGS.find((t) => t.id === id)!;
@@ -50,6 +52,18 @@ it('saves once even if Save play is tapped twice quickly', async () => {
   expect(screen.getByRole('button', { name: 'Save play' })).toBeDisabled();
 });
 
+it('ignores a second tap that arrives before React has re-rendered (the ref guard alone)', () => {
+  const onSave = vi.fn<(e: PlayLogEntry) => Promise<void>>(() => new Promise(() => {}));
+  render(<LogForm mode="battle" battle={battle} rec={rec} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+  const button = screen.getByRole('button', { name: 'Save play' });
+  // Both clicks happen inside one act(), so the button is still enabled for the second one.
+  act(() => {
+    button.click();
+    button.click();
+  });
+  expect(onSave).toHaveBeenCalledTimes(1);
+});
+
 it('keeps the same entry id when retrying after a failed save', async () => {
   const user = userEvent.setup();
   const onSave = vi.fn<(e: PlayLogEntry) => Promise<void>>().mockRejectedValueOnce(new Error('x')).mockResolvedValue();
@@ -80,6 +94,37 @@ describe('turn detail', () => {
     expect(turn.attacker).toBe(otherTag.id);
     expect(turn.aimedAt).toBe('1-3-001');
     expect(turn.defeated).toBe('1-3-001');
+  });
+
+  it('keeps the predicted defeat for the planned attacker and aim, and drops it when either is changed', async () => {
+    const user = userEvent.setup();
+    // Normal moves only do half damage to the Rock Boss and both cronies fall in one hit, so turn 1 predicts a defeat.
+    const opp = (id: string, o = {}) => makeTag(id, { ...o, stats: { attack: 1, speed: 1, ...(o as { stats?: object }).stats } });
+    const team = [makeTag('A', { stats: { attack: 40 } }), makeTag('B', { stats: { attack: 40 } })];
+    const b: Battle = {
+      opponents: [opp('boss', { types: ['rock'] }), opp('c1', { stats: { hp: 40 } }), opp('c2', { stats: { hp: 40 } })],
+      targetIndex: 0,
+    };
+    const plan = bestPlan(team, b)!;
+    const r = { team, plan } as unknown as Recommendation;
+    const planned = plan.steps[0];
+    expect(planned.expectDefeat).toBe(true); // without a prediction this test would prove nothing
+
+    const saveWith = async (change?: () => Promise<unknown>) => {
+      const onSave = vi.fn<(e: PlayLogEntry) => void>();
+      const { unmount } = render(<LogForm mode="battle" battle={b} rec={r} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+      await user.click(screen.getByRole('checkbox', { name: 'Add turn detail' }));
+      await change?.();
+      await user.click(screen.getByRole('button', { name: 'Save play' }));
+      unmount();
+      return onSave.mock.calls[0][0].turns[0];
+    };
+
+    expect((await saveWith()).predictedDefeat).toBe(true);
+    const otherAttacker = team.find((t) => t.id !== planned.tagId)!;
+    expect((await saveWith(() => user.selectOptions(screen.getByLabelText('Turn 1 attacker'), otherAttacker.id))).predictedDefeat).toBeUndefined();
+    const otherAim = [0, 1, 2].find((n) => n !== planned.aimAtIndex)!;
+    expect((await saveWith(() => user.selectOptions(screen.getByLabelText('Turn 1 aimed at'), String(otherAim)))).predictedDefeat).toBeUndefined();
   });
 
   it('warns, without blocking, when a crony defeat is ticked but the count is 0', async () => {
