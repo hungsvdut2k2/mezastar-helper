@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import type { BallType, PlayLogEntry, PlayMode } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import type { Recommendation } from '../../engine/recommend';
+import { opponentLabels } from '../format';
+import { useFocusHeading } from '../useFocusHeading';
 
 type Props = {
   mode: PlayMode;
@@ -32,7 +34,15 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
   const [ball, setBall] = useState<BallType | undefined>(undefined);
   const [note, setNote] = useState('');
   const [withTurns, setWithTurns] = useState(false);
-  const [defeatedAt, setDefeatedAt] = useState<boolean[]>(steps.map(() => false));
+  // Turn detail starts as the plan; the player can change who attacked and who was aimed at.
+  const [turnState, setTurnState] = useState(() =>
+    steps.map((s) => ({ attacker: s.tagId, aim: s.aimAtIndex as number, defeated: false })),
+  );
+  const changeTurn = (i: number, patch: Partial<(typeof turnState)[number]>) =>
+    setTurnState((all) => all.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  const labels = opponentLabels(battle.opponents);
+  const headingRef = useFocusHeading();
+  const cronyDefeatTicked = withTurns && turnState.some((t) => t.defeated && t.aim !== 0);
 
   // One id per form, so a repeated tap can never create a second entry.
   const [entryId] = useState(newId);
@@ -66,12 +76,17 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
       superstarAppeared: battle.opponents.some((o) => o.grade === 6),
       teamUsed: rec.team.map((t) => t.id),
       turns: withTurns
-        ? steps.map((s, i) => ({
-            attacker: s.tagId,
-            aimedAt: s.aimAtId,
-            defeated: defeatedAt[i] ? s.aimAtId : undefined,
-            predictedDefeat: s.expectDefeat ?? undefined,
-          }))
+        ? steps.map((s, i) => {
+            const aimedAt = battle.opponents[turnState[i].aim].id;
+            return {
+              attacker: turnState[i].attacker,
+              aimedAt,
+              defeated: turnState[i].defeated ? aimedAt : undefined,
+              // The plan only predicted this for its own attacker and aim.
+              predictedDefeat:
+                turnState[i].attacker === s.tagId && turnState[i].aim === s.aimAtIndex ? (s.expectDefeat ?? undefined) : undefined,
+            };
+          })
         : [],
       cronyDefeatedCount: cronyDefeated,
       bossDefeated,
@@ -83,14 +98,16 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
 
   return (
     <section>
-      <h1>Log this play</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        Log this play
+      </h1>
       <label>
         Location
         <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Arcade or machine" />
       </label>
 
-      <h2>Cronies defeated</h2>
-      <div className="segmented">
+      <h2 id="log-cronies">Cronies defeated</h2>
+      <div className="segmented" role="group" aria-labelledby="log-cronies">
         {([0, 1, 2] as const).map((n) => (
           <button key={n} type="button" aria-pressed={cronyDefeated === n} onClick={() => setCronyDefeated(n)}>
             {n}
@@ -98,8 +115,8 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
         ))}
       </div>
 
-      <h2>Boss defeated?</h2>
-      <div className="segmented">
+      <h2 id="log-boss">Boss defeated?</h2>
+      <div className="segmented" role="group" aria-labelledby="log-boss">
         <button type="button" aria-pressed={bossDefeated} onClick={() => setBossDefeated(true)}>
           Yes
         </button>
@@ -108,20 +125,20 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
         </button>
       </div>
 
-      <h2>Caught</h2>
-      <div className="segmented">
+      <h2 id="log-caught">Caught</h2>
+      <div className="segmented" role="group" aria-labelledby="log-caught">
         <button type="button" aria-pressed={caughtIndex === null} onClick={() => setCaughtIndex(null)}>
           Nothing
         </button>
         {battle.opponents.map((o, i) => (
           <button key={i} type="button" aria-pressed={caughtIndex === i} onClick={() => setCaughtIndex(i)}>
-            {o.name}
+            {labels[i]}
           </button>
         ))}
       </div>
 
-      <h2>Ball (optional)</h2>
-      <div className="segmented">
+      <h2 id="log-ball">Ball (optional)</h2>
+      <div className="segmented" role="group" aria-labelledby="log-ball">
         {BALLS.map((b) => (
           <button key={b.id} type="button" aria-pressed={ball === b.id} onClick={() => setBall(ball === b.id ? undefined : b.id)}>
             {b.label}
@@ -136,21 +153,44 @@ export function LogForm({ mode, battle, rec, lastLocation, onSave, onCancel }: P
         </label>
       )}
       {withTurns && (
-        <ol className="turns">
-          {steps.map((s, i) => (
-            <li key={s.turn}>
-              {`Turn ${s.turn}: ${s.tagName} → ${s.aimAtLabel}`}
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={defeatedAt[i]}
-                  onChange={(e) => setDefeatedAt(defeatedAt.map((d, j) => (j === i ? e.target.checked : d)))}
-                />
-                Defeated it
-              </label>
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="turns">
+            {steps.map((s, i) => (
+              <li key={s.turn}>
+                <strong>{`Turn ${s.turn}`}</strong>
+                <label>
+                  {`Turn ${s.turn} attacker`}
+                  <select value={turnState[i].attacker} onChange={(e) => changeTurn(i, { attacker: e.target.value })}>
+                    {rec.team.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {`Turn ${s.turn} aimed at`}
+                  <select value={turnState[i].aim} onChange={(e) => changeTurn(i, { aim: Number(e.target.value) })}>
+                    {battle.opponents.map((o, k) => (
+                      <option key={k} value={k}>
+                        {labels[k]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={turnState[i].defeated} onChange={(e) => changeTurn(i, { defeated: e.target.checked })} />
+                  Defeated it
+                </label>
+              </li>
+            ))}
+          </ol>
+          {cronyDefeatTicked && cronyDefeated === 0 && (
+            <p className="notice" role="status">
+              You ticked a crony as defeated in the turn detail, but "Cronies defeated" is 0. You can still save.
+            </p>
+          )}
+        </>
       )}
 
       <label>

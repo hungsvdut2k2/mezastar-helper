@@ -59,3 +59,47 @@ it('keeps the same entry id when retrying after a failed save', async () => {
   await user.click(screen.getByRole('button', { name: 'Save play' }));
   expect(onSave.mock.calls[1][0].id).toBe(onSave.mock.calls[0][0].id);
 });
+
+describe('turn detail', () => {
+  const setup = () => {
+    const onSave = vi.fn<(e: PlayLogEntry) => void>();
+    render(<LogForm mode="battle" battle={battle} rec={rec} lastLocation="" onSave={onSave} onCancel={() => {}} />);
+    return onSave;
+  };
+
+  it('lets the player change the attacker and the aim of a turn', async () => {
+    const user = userEvent.setup();
+    const onSave = setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Add turn detail' }));
+    const otherTag = rec.team[rec.team.length - 1];
+    await user.selectOptions(screen.getByLabelText('Turn 1 attacker'), otherTag.id);
+    await user.selectOptions(screen.getByLabelText('Turn 1 aimed at'), '0');
+    await user.click(screen.getAllByRole('checkbox', { name: 'Defeated it' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Save play' }));
+    const turn = onSave.mock.calls[0][0].turns[0];
+    expect(turn.attacker).toBe(otherTag.id);
+    expect(turn.aimedAt).toBe('1-3-001');
+    expect(turn.defeated).toBe('1-3-001');
+  });
+
+  it('warns, without blocking, when a crony defeat is ticked but the count is 0', async () => {
+    const user = userEvent.setup();
+    const onSave = setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Add turn detail' }));
+    await user.selectOptions(screen.getByLabelText('Turn 1 aimed at'), '1');
+    expect(screen.queryByText(/but "Cronies defeated" is 0/)).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole('checkbox', { name: 'Defeated it' })[0]);
+    expect(screen.getByRole('status')).toHaveTextContent(/"Cronies defeated" is 0/);
+    await user.click(screen.getByRole('button', { name: 'Save play' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+});
+
+it('groups its button rows and focuses the heading', () => {
+  render(<LogForm mode="battle" battle={battle} rec={rec} lastLocation="" onSave={() => {}} onCancel={() => {}} />);
+  expect(screen.getByRole('group', { name: 'Cronies defeated' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Boss defeated?' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Caught' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Ball (optional)' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Log this play' })).toHaveFocus();
+});

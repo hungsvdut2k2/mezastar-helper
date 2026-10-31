@@ -18,3 +18,20 @@ export function searchTags(tags: Tag[], query: string): Tag[] {
   if (!q) return tags;
   return tags.filter((t) => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q));
 }
+
+const two = (n: number) => String(n).padStart(2, '0');
+
+/** YYYY-MM-DD in the phone's local time zone (not UTC). */
+export function localDate(when: Date | string): string {
+  const d = typeof when === 'string' ? new Date(when) : when;
+  if (Number.isNaN(d.getTime())) return typeof when === 'string' ? when.slice(0, 10) : '';
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+}
+
+const SLOT_NAMES = ['Boss', 'Crony 1', 'Crony 2'];
+
+/** Opponent names for buttons. If two share a name, every label gets its slot, e.g. "Crony 1: Pidgeot". */
+export function opponentLabels(opponents: Tag[]): string[] {
+  const duplicated = new Set(opponents.map((o) => o.name)).size < opponents.length;
+  return opponents.map((o, i) => (duplicated ? `${SLOT_NAMES[i]}: ${o.name}` : o.name));
+}
