@@ -7,9 +7,17 @@ import { TagPicker } from '../components/TagPicker';
 import type { AppStore } from '../useAppData';
 
 export function PlanScreen({ store }: { store: AppStore }) {
-  const [target, setTarget] = useState<Tag | null>(null);
-  const [crony1, setCrony1] = useState<Tag | null>(null);
-  const [crony2, setCrony2] = useState<Tag | null>(null);
+  // Ids, not Tag objects, so a correction made in Collection reaches the plan.
+  const [targetId, setTargetId] = useState<string | null>(null);
+  const [crony1Id, setCrony1Id] = useState<string | null>(null);
+  const [crony2Id, setCrony2Id] = useState<string | null>(null);
+  const find = (id: string | null) => (id ? (store.tags.find((t) => t.id === id) ?? null) : null);
+  const target = find(targetId);
+  const crony1 = find(crony1Id);
+  const crony2 = find(crony2Id);
+  const setTarget = (t: Tag | null) => setTargetId(t?.id ?? null);
+  const setCrony1 = (t: Tag | null) => setCrony1Id(t?.id ?? null);
+  const setCrony2 = (t: Tag | null) => setCrony2Id(t?.id ?? null);
 
   const owned = useMemo(
     () => store.tags.filter((t) => store.data.owned.includes(t.id)),

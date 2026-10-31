@@ -18,7 +18,8 @@ const SLOTS = ['Boss', 'Crony 1', 'Crony 2'];
 
 export function PlayScreen({ store }: { store: AppStore }) {
   const [mode, setMode] = useState<PlayMode>('battle');
-  const [picked, setPicked] = useState<(Tag | null)[]>([null, null, null]);
+  // Ids, not Tag objects, so a correction made in Collection reaches the battle.
+  const [pickedIds, setPickedIds] = useState<(string | null)[]>([null, null, null]);
   const [targetIndex, setTargetIndex] = useState<0 | 1 | 2>(0);
   const [logging, setLogging] = useState<Recommendation | null>(null);
   const [saved, setSaved] = useState(false);
@@ -26,6 +27,10 @@ export function PlayScreen({ store }: { store: AppStore }) {
   const owned = useMemo(
     () => store.tags.filter((t) => store.data.owned.includes(t.id)),
     [store.tags, store.data.owned],
+  );
+  const picked = useMemo(
+    () => pickedIds.map((id) => (id ? (store.tags.find((t) => t.id === id) ?? null) : null)),
+    [pickedIds, store.tags],
   );
   const [boss, crony1, crony2] = picked;
   const headingRef = useFocusHeading(saved);
@@ -36,7 +41,7 @@ export function PlayScreen({ store }: { store: AppStore }) {
   );
 
   const pick = (slot: number) => (tag: Tag | null) => {
-    setPicked((p) => p.map((x, i) => (i === slot ? tag : x)));
+    setPickedIds((p) => p.map((x, i) => (i === slot ? (tag?.id ?? null) : x)));
     setSaved(false);
   };
 
@@ -51,7 +56,7 @@ export function PlayScreen({ store }: { store: AppStore }) {
         onSave={async (entry) => {
           if (!(await store.addLog(entry))) throw new Error('not saved');
           setLogging(null);
-          setPicked([null, null, null]);
+          setPickedIds([null, null, null]);
           setTargetIndex(0);
           setSaved(true);
         }}
