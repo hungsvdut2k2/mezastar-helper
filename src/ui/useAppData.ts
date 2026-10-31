@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { TAGS } from '../data/tags';
 import type { PlayLogEntry, TagCorrection } from '../data/types';
 import { applyCorrections } from '../engine/corrections';
-import { restoreFromText, type ParseResult } from '../storage/backup';
+import { blobToDataUrl, restoreFromText, type ParseResult } from '../storage/backup';
 import * as db from '../storage/db';
 import type { AppData } from '../storage/db';
 
@@ -27,14 +27,32 @@ export function useAppData() {
     latest.current = next;
     setDataState(next);
   };
+  // Tag photos as object URLs. The ref is the truth (so URLs can be revoked); the state is a copy for rendering.
+  const photoUrls = useRef(new Map<string, string>());
+  const [photos, setPhotosState] = useState<Map<string, string>>(new Map());
+  const syncPhotos = () => setPhotosState(new Map(photoUrls.current));
+  /** Show exactly these photos; every previous object URL is revoked. */
+  const replacePhotoUrls = (blobs: Record<string, Blob>) => {
+    for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
+    photoUrls.current = new Map(Object.entries(blobs).map(([id, blob]) => [id, URL.createObjectURL(blob)]));
+    syncPhotos();
+  };
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    db.loadAll()
-      .then(setData)
+    Promise.all([db.loadAll(), db.getAllPhotos().catch(() => ({}) as Record<string, Blob>)])
+      .then(([loadedData, blobs]) => {
+        setData(loadedData);
+        replacePhotoUrls(blobs);
+      })
       .catch(() => setError('Could not open storage on this phone. Changes will not be saved.'))
       .finally(() => setLoaded(true));
+    // Let go of the object URLs when the app goes away.
+    return () => {
+      for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
+      photoUrls.current.clear();
+    };
   }, []);
 
   const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
@@ -83,7 +101,41 @@ export function useAppData() {
     tags,
     loaded,
     error,
+    photos,
     dismissError: () => setError(null),
+    /** Save an already-processed photo. The picture appears once it is stored. */
+    async setPhoto(id: string, blob: Blob): Promise<boolean> {
+      try {
+        await db.putPhoto(id, blob);
+      } catch {
+        setError('Your photo was not saved.');
+        return false;
+      }
+      const old = photoUrls.current.get(id);
+      photoUrls.current.set(id, URL.createObjectURL(blob));
+      if (old) URL.revokeObjectURL(old);
+      syncPhotos();
+      return true;
+    },
+    async removePhoto(id: string): Promise<boolean> {
+      try {
+        await db.deletePhoto(id);
+      } catch {
+        setError('Your photo was not removed.');
+        return false;
+      }
+      const old = photoUrls.current.get(id);
+      photoUrls.current.delete(id);
+      if (old) URL.revokeObjectURL(old);
+      syncPhotos();
+      return true;
+    },
+    /** All stored photos as data URLs, for a backup file. */
+    async exportPhotos(): Promise<Record<string, string>> {
+      const blobs = await db.getAllPhotos();
+      const entries = await Promise.all(Object.entries(blobs).map(async ([id, b]) => [id, await blobToDataUrl(b)] as const));
+      return Object.fromEntries(entries);
+    },
     toggleOwned(tagId: string) {
       const nowOwned = !latest.current.owned.includes(tagId);
       return write(
@@ -126,7 +178,10 @@ export function useAppData() {
     async restore(text: string): Promise<ParseResult> {
       try {
         const result = await restoreFromText(text);
-        if (result.ok) setData(result.data);
+        if (result.ok) {
+          setData(result.data);
+          replacePhotoUrls(result.photos);
+        }
         return result;
       } catch {
         return { ok: false, error: 'Saving the restored data failed.' };

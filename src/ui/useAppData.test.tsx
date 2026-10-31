@@ -260,3 +260,89 @@ describe('addLog when saving fails', () => {
     expect(screen.queryByRole('button', { name: 'where: Osaka' })).not.toBeInTheDocument();
   });
 });
+
+describe('photos', () => {
+  const blob = (s: string) => new Blob([s], { type: 'image/jpeg' });
+  let n = 0;
+  let created: string[];
+  let revoked: string[];
+  beforeEach(() => {
+    created = [];
+    revoked = [];
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
+      const url = `blob:t/${++n}`;
+      created.push(url);
+      return url;
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation((u) => void revoked.push(u));
+  });
+
+  function Probe({ store }: { store: import('./useAppData').AppStore }) {
+    return (
+      <>
+        <p data-testid="url">{store.photos.get('1-3-001') ?? 'none'}</p>
+        <p>{store.error ?? 'no error'}</p>
+        <button type="button" onClick={() => store.setPhoto('1-3-001', blob('a'))}>set</button>
+        <button type="button" onClick={() => store.removePhoto('1-3-001')}>remove</button>
+      </>
+    );
+  }
+
+  it('adds, replaces (revoking the old URL) and removes a photo', async () => {
+    const user = userEvent.setup();
+    render(<WithStore>{(store) => <Probe store={store} />}</WithStore>);
+    await screen.findByTestId('url');
+    await user.click(screen.getByRole('button', { name: 'set' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[0]));
+    expect(Object.keys(await dbModule.getAllPhotos())).toEqual(['1-3-001']);
+    await user.click(screen.getByRole('button', { name: 'set' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[1]));
+    expect(revoked).toEqual([created[0]]);
+    await user.click(screen.getByRole('button', { name: 'remove' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('none'));
+    expect(revoked).toEqual([created[0], created[1]]);
+    expect(await dbModule.getAllPhotos()).toEqual({});
+  });
+
+  it('loads stored photos and revokes them on unmount', async () => {
+    await dbModule.putPhoto('1-3-001', blob('a'));
+    const { unmount } = render(<WithStore>{(store) => <Probe store={store} />}</WithStore>);
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^blob:t/));
+    const shown = created[created.length - 1];
+    unmount();
+    expect(revoked).toContain(shown);
+  });
+
+  it('shows an error and no picture when saving fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(dbModule, 'putPhoto').mockRejectedValueOnce(new Error('full'));
+    render(<WithStore>{(store) => <Probe store={store} />}</WithStore>);
+    await user.click(await screen.findByRole('button', { name: 'set' }));
+    expect(await screen.findByText('Your photo was not saved.')).toBeInTheDocument();
+    expect(screen.getByTestId('url')).toHaveTextContent('none');
+  });
+
+  it('restore replaces photos and revokes the old URLs', async () => {
+    const user = userEvent.setup();
+    const png = `data:image/png;base64,${btoa('hello')}`;
+    const text = JSON.stringify({
+      app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], photos: { '1-3-001': png },
+    });
+    render(
+      <WithStore>
+        {(store) => (
+          <>
+            <Probe store={store} />
+            <button type="button" onClick={() => store.restore(text)}>restore</button>
+          </>
+        )}
+      </WithStore>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'set' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[0]));
+    await user.click(screen.getByRole('button', { name: 'restore' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[created.length - 1]));
+    expect(revoked).toContain(created[0]);
+    expect(created.length).toBe(2);
+  });
+});
