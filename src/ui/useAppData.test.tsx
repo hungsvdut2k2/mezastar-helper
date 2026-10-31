@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as dbModule from '../storage/db';
 import { loadAll, setOwned } from '../storage/db';
 import { freshDb } from '../test/freshDb';
 import { WithStore } from './testHarness';
@@ -34,4 +35,46 @@ it('saves a toggle to storage', async () => {
   await user.click(await screen.findByRole('button', { name: 'owned: 0' }));
   expect(await screen.findByRole('button', { name: 'owned: 1' })).toBeInTheDocument();
   expect((await loadAll()).owned).toEqual(['1-3-002']);
+});
+
+it('shows an error when saving fails, but keeps the change on screen', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(dbModule, 'setOwned').mockRejectedValueOnce(new Error('disk full'));
+  render(
+    <WithStore>
+      {(store) => (
+        <>
+          <button type="button" onClick={() => store.toggleOwned('1-3-002')}>
+            owned: {store.data.owned.length}
+          </button>
+          <p>{store.error ?? 'no error'}</p>
+        </>
+      )}
+    </WithStore>,
+  );
+  await user.click(await screen.findByRole('button', { name: 'owned: 0' }));
+  expect(await screen.findByText('Your latest change was not saved.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'owned: 1' })).toBeInTheDocument();
+  vi.restoreAllMocks();
+});
+
+it('never duplicates an id on fast double taps', async () => {
+  render(
+    <WithStore>
+      {(store) => (
+        <button
+          type="button"
+          onClick={() => {
+            store.toggleOwned('1-3-002');
+            store.toggleOwned('1-3-002');
+            store.toggleOwned('1-3-002');
+          }}
+        >
+          owned: {store.data.owned.join(',') || 'none'}
+        </button>
+      )}
+    </WithStore>,
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'owned: none' }));
+  expect(await screen.findByRole('button', { name: 'owned: 1-3-002' })).toBeInTheDocument();
 });

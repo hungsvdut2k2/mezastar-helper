@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TAGS } from '../data/tags';
 import type { PlayLogEntry, TagCorrection } from '../data/types';
 import { applyCorrections } from '../engine/corrections';
@@ -9,7 +9,13 @@ import type { AppData } from '../storage/db';
 const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [] };
 
 export function useAppData() {
-  const [data, setData] = useState<AppData>(EMPTY_DATA);
+  const [data, setDataState] = useState<AppData>(EMPTY_DATA);
+  // Always the newest data, so quick taps never work from a stale snapshot.
+  const latest = useRef<AppData>(EMPTY_DATA);
+  const setData = (next: AppData) => {
+    latest.current = next;
+    setDataState(next);
+  };
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +30,7 @@ export function useAppData() {
 
   /** Update the screen right away, then save; tell the player if saving failed. */
   async function write(update: (d: AppData) => AppData, persist: () => Promise<void>) {
-    setData(update);
+    setData(update(latest.current));
     try {
       await persist();
     } catch {
@@ -39,9 +45,12 @@ export function useAppData() {
     error,
     dismissError: () => setError(null),
     toggleOwned(tagId: string) {
-      const nowOwned = !data.owned.includes(tagId);
+      const nowOwned = !latest.current.owned.includes(tagId);
       return write(
-        (d) => ({ ...d, owned: nowOwned ? [...d.owned, tagId] : d.owned.filter((id) => id !== tagId) }),
+        (d) => ({
+          ...d,
+          owned: nowOwned ? [...d.owned.filter((id) => id !== tagId), tagId] : d.owned.filter((id) => id !== tagId),
+        }),
         () => db.setOwned(tagId, nowOwned),
       );
     },
