@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { setById } from '../data/setInfo';
 import { StarBadge, TAB_ICONS } from './components/icons';
 import { CollectionScreen } from './screens/CollectionScreen';
@@ -30,6 +30,20 @@ function Pane({ active, children }: { active: boolean; children: ReactNode }) {
 export function App() {
   const store = useAppData();
   const [tab, setTab] = useState<TabId>('play');
+  const appRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Headings scroll under the sticky header (which grows when the error banner shows), so publish its height.
+  useEffect(() => {
+    const app = appRef.current;
+    const header = headerRef.current;
+    if (!app || !header || typeof ResizeObserver === 'undefined') return;
+    const measure = () => app.style.setProperty('--topbar-h', `${header.offsetHeight}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   // Ask the browser not to evict our data under storage pressure; the answer does not matter.
   useEffect(() => {
@@ -46,8 +60,8 @@ export function App() {
   }, [tab]);
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <div className="app" ref={appRef}>
+      <header className="topbar" ref={headerRef}>
         <div className="topbar-inner">
           <StarBadge className="logo" />
           <p className="brand">

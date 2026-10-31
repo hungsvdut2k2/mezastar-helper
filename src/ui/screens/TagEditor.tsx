@@ -53,7 +53,12 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
   const [saving, setSaving] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => heading.current?.focus(), []);
+  useEffect(() => {
+    // Focus for screen readers without letting the browser scroll the picture out of view.
+    const h = heading.current;
+    h?.focus({ preventScroll: true });
+    h?.closest('.tc')?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
   async function save() {
     const parsed = {} as Record<Field, number | null>;
     for (const [field, label] of FIELDS) {

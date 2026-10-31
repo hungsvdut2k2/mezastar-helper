@@ -61,21 +61,20 @@
 /* ===== base ===== */
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body {
-  margin: 0;
+body { margin: 0; background: var(--bg); overflow-x: hidden; }
+/* A fixed layer instead of background-attachment: fixed, which iOS Safari handles badly. */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(120% 60% at 50% -10%, rgba(200, 16, 46, 0.18), transparent 60%),
-    radial-gradient(80% 40% at 100% 100%, rgba(255, 204, 51, 0.06), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
-  overflow-x: hidden;
+    radial-gradient(80% 40% at 100% 100%, rgba(255, 204, 51, 0.06), transparent 60%);
 }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 a { color: var(--link); overflow-wrap: anywhere; }
 .app { min-height: 100dvh; padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 main { padding: 16px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left)); max-width: 640px; margin: 0 auto; }
-h1 { font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 0.01em; margin: 4px 0 14px; scroll-margin-top: 110px; overflow-wrap: anywhere; }
+h1 { font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 0.01em; margin: 4px 0 14px; scroll-margin-top: calc(var(--topbar-h, calc(64px + env(safe-area-inset-top))) + 12px); overflow-wrap: anywhere; }
 h1::after { content: ''; display: block; width: 56px; height: 4px; margin-top: 6px; border-radius: 2px; background: linear-gradient(90deg, var(--red-bright), var(--gold)); }
 h1 small { font-style: normal; }
 h2 { font-size: 1.1rem; font-weight: 800; margin: 22px 0 8px; color: var(--gold-soft); }
@@ -112,6 +111,12 @@ input, select, textarea {
 input::placeholder, textarea::placeholder { color: #8d97b8; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--focus); }
 textarea { min-height: 88px; }
+select {
+  -webkit-appearance: none; appearance: none; min-height: 44px; padding-right: 40px;
+  background-color: #0d1430;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 9l7 7 7-7' fill='none' stroke='%23ffe27a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 18px 18px;
+}
 label { display: block; margin: 10px 0; font-weight: 700; }
 label.check { display: flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 400; }
 label.check input { width: 22px; height: 22px; min-height: 0; margin: 0; flex: none; accent-color: var(--gold); }
@@ -191,7 +196,7 @@ details[open] > summary::before { transform: rotate(90deg); }
 .picker { margin: 10px 0; min-width: 0; }
 .picker-label { display: block; font-weight: 800; color: var(--gold-soft); }
 .picker-results { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.picker-results button, .chip, .tag-row {
+.picker-results button, .tag-row {
   display: block; width: 100%; padding: 0; text-align: left;
   border: none; background: none; box-shadow: none; border-radius: var(--radius-l);
 }
@@ -199,10 +204,11 @@ details[open] > summary::before { transform: rotate(90deg); }
 .picker-status:empty { margin: 0; }
 .chip { position: relative; margin-top: 4px; }
 .chip-x {
-  position: absolute; top: 6px; right: 6px; z-index: 2;
-  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(7, 10, 22, 0.85); color: #ffffff; border: 2px solid var(--gold); font-weight: 900; font-size: 0.85rem;
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%;
+  background: rgba(7, 10, 22, 0.85); color: #ffffff; border: 2px solid var(--gold); font-weight: 900; font-size: 1rem;
 }
+.chip .tc-small .tc-body { padding-right: 56px; }
 /* Picked opponents sit side by side; a slot that is still searching takes the full row. */
 .slot-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
 .slot-row > .picker:has(input) { grid-column: 1 / -1; }
@@ -219,6 +225,7 @@ details[open] > summary::before { transform: rotate(90deg); }
   background: linear-gradient(135deg, var(--tc-a, #39437a) 0%, var(--tc-a, #39437a) 35%, var(--tc-b, #1b2246) 100%);
 }
 .tc-no-photo .tc-pic::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 6px, transparent 6px 16px); }
+.tc-large { scroll-margin-top: calc(var(--topbar-h, calc(64px + env(safe-area-inset-top))) + 12px); }
 .tc-large .tc-pic { height: 176px; }
 .tc-medium .tc-pic { height: 96px; }
 .tc-photo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -257,13 +264,15 @@ details[open] > summary::before { transform: rotate(90deg); }
 .tc-small .tc-body { padding: 6px 10px; gap: 3px; justify-content: center; }
 /* 6★ Superstar: gold frame and a slow shine over the picture */
 .tc-superstar { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-deep), 0 0 16px rgba(255, 204, 51, 0.35); }
-.tc-superstar .tc-pic::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+/* Only medium and large cards shine: the transform runs on the compositor, and small cards in grids stay still. */
+.tc-superstar.tc-medium .tc-pic::after, .tc-superstar.tc-large .tc-pic::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 300%; pointer-events: none;
   background: linear-gradient(110deg, transparent 35%, rgba(255, 244, 200, 0.55) 50%, transparent 65%);
-  background-size: 260% 100%; background-position: 150% 0;
+  transform: translateX(-66.7%); will-change: transform;
   animation: tc-shine 3.6s ease-in-out infinite;
 }
-@keyframes tc-shine { 0% { background-position: 150% 0; } 55%, 100% { background-position: -60% 0; } }
+.tag-list li:has(.own[aria-pressed='false']) .tc-pic::after { animation: none; display: none; }
+@keyframes tc-shine { 0% { transform: translateX(-66.7%); } 55%, 100% { transform: translateX(0); } }
 
 /* ===== team cards and the turn timeline ===== */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); padding: 12px; margin: 14px 0; box-shadow: var(--shadow-2); }

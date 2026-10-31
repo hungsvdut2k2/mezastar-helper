@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MY_TAGS_ID, isCustomId, printedCode, setLabel } from '../../data/setInfo';
 import { TAGS } from '../../data/tags';
-import type { Tag } from '../../data/types';
+import { GIMMICK_NAME, type Tag } from '../../data/types';
 import { TagCard } from '../components/TagCard';
 import { gradeLabel, searchTags, typeLabel } from '../format';
 import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setChoices';
@@ -181,7 +181,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
                 className="tag-row"
                 data-row-id={t.id}
                 // The same name the row had as plain text, so it stays stable for screen reader users.
-                aria-label={`${labelOf(t)} ${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}
+                aria-label={`${labelOf(t)} ${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}${t.gimmick ? ` · ${GIMMICK_NAME[t.gimmick.kind]}` : ''}`}
                 onClick={() => setEditingId(t.id)}
               >
                 <TagCard tag={t} size="small" name={labelOf(t)} meta={`${printedCode(t)} · ${setLabel(t)}`} photoUrl={store.photos.get(t.id)} />
