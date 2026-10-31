@@ -1,3 +1,4 @@
+import type { PlayLogEntry } from '../data/types';
 import { freshDb } from '../test/freshDb';
 import { makeLogEntry } from '../test/factories';
 import { addLogEntry, deleteLogEntry, loadAll, replaceAll, saveCorrection, saveNote, setOwned } from './db';
@@ -38,5 +39,20 @@ describe('storage', () => {
     const next = { owned: ['1-3-002'], corrections: {}, notes: { immunity: 'zero' }, log: [makeLogEntry({ id: 'x' })] };
     await replaceAll(next);
     expect(await loadAll()).toEqual(next);
+  });
+
+  it('replaceAll is all-or-nothing: a failing put keeps the old data', async () => {
+    await setOwned('1-3-001', true);
+    await saveNote('lanes', 'old');
+    await addLogEntry(makeLogEntry({ id: 'keep' }));
+    const before = await loadAll();
+    const broken = {
+      owned: ['1-3-002'],
+      corrections: {},
+      notes: { n: 'new' },
+      log: [{ ...makeLogEntry({ id: 'x' }), id: undefined } as unknown as PlayLogEntry], // no key: put fails
+    };
+    await expect(replaceAll(broken)).rejects.toThrow();
+    expect(await loadAll()).toEqual(before);
   });
 });

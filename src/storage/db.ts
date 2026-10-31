@@ -19,14 +19,32 @@ const DB_NAME = 'mezastar-helper';
 let dbPromise: Promise<IDBPDatabase<HelperDB>> | null = null;
 
 function getDb() {
-  dbPromise ??= openDB<HelperDB>(DB_NAME, 1, {
-    upgrade(db) {
-      db.createObjectStore('owned');
-      db.createObjectStore('corrections');
-      db.createObjectStore('notes');
-      db.createObjectStore('log', { keyPath: 'id' });
-    },
-  });
+  if (!dbPromise) {
+    const opening = openDB<HelperDB>(DB_NAME, 1, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('owned');
+          db.createObjectStore('corrections');
+          db.createObjectStore('notes');
+          db.createObjectStore('log', { keyPath: 'id' });
+        }
+      },
+      // Another tab wants to upgrade or delete the database: let go so it can.
+      blocking() {
+        dbPromise = null;
+        opening.then((db) => db.close()).catch(() => {});
+      },
+      // The browser closed the connection unexpectedly: reconnect on next use.
+      terminated() {
+        dbPromise = null;
+      },
+    });
+    dbPromise = opening;
+    // A rejected open must not be cached forever.
+    opening.catch(() => {
+      if (dbPromise === opening) dbPromise = null;
+    });
+  }
   return dbPromise;
 }
 
@@ -92,12 +110,24 @@ export async function replaceAll(data: AppData) {
   const corrections = tx.objectStore('corrections');
   const notes = tx.objectStore('notes');
   const log = tx.objectStore('log');
-  await Promise.all([owned.clear(), corrections.clear(), notes.clear(), log.clear()]);
-  await Promise.all([
-    ...data.owned.map((id) => owned.put(true, id)),
-    ...Object.entries(data.corrections).map(([id, c]) => corrections.put(c, id)),
-    ...Object.entries(data.notes).map(([id, text]) => notes.put(text, id)),
-    ...data.log.map((entry) => log.put(entry)),
-    tx.done,
-  ]);
+  const pending: Promise<unknown>[] = [tx.done];
+  try {
+    // Requests run in order inside the transaction, so clear-then-put needs no waiting in between.
+    pending.push(owned.clear(), corrections.clear(), notes.clear(), log.clear());
+    for (const id of data.owned) pending.push(owned.put(true, id));
+    for (const [id, c] of Object.entries(data.corrections)) pending.push(corrections.put(c, id));
+    for (const [id, text] of Object.entries(data.notes)) pending.push(notes.put(text, id));
+    for (const entry of data.log) pending.push(log.put(entry));
+    await Promise.all(pending);
+  } catch (err) {
+    // A synchronous failure would otherwise let the transaction commit the clears.
+    // Requests already queued reject with AbortError; mark them handled.
+    for (const p of pending) p.catch(() => {});
+    try {
+      tx.abort();
+    } catch {
+      /* already finished or aborted */
+    }
+    throw err;
+  }
 }
