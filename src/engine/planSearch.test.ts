@@ -33,10 +33,19 @@ describe('bestPlan', () => {
     expect(plan.comparison).toBe('This is the usual crony-first plan, and it is the best here.');
   });
 
-  it('never uses the same tag on two turns in a row', () => {
-    const team = [makeTag('A', { stats: { attack: 300 } }), makeTag('B'), makeTag('C')];
+  it('rotates tags when they are equally strong (a tired tag hits weaker)', () => {
+    const team = [makeTag('A'), makeTag('B'), makeTag('C')];
     const plan = bestPlan(team, battleOf(opp('boss', { stats: { hp: 5000 } }), opp('c1'), opp('c2')))!;
     for (let i = 1; i < plan.steps.length; i++) expect(plan.steps[i].tagId).not.toBe(plan.steps[i - 1].tagId);
+    expect(plan.steps.some((s) => s.why.includes('Tired'))).toBe(false);
+  });
+
+  it('reuses a much stronger tag when it is worth it, and says it is tired', () => {
+    const team = [makeTag('A', { stats: { attack: 300 } }), makeTag('B'), makeTag('C')];
+    const plan = bestPlan(team, battleOf(opp('boss', { stats: { hp: 5000 } }), opp('c1'), opp('c2')))!;
+    expect(plan.steps.map((s) => s.tagId)).toEqual(['A', 'A', 'A']);
+    expect(plan.steps[0].why).not.toContain('Tired');
+    expect(plan.steps[1].why).toContain('Tired: attacks later, no Roulette boost.');
   });
 
   it('can aim at a crony target', () => {

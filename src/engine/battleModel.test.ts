@@ -48,9 +48,22 @@ describe('simulate', () => {
     expect(r.damageToTarget).toBe(40 + MODEL.supporterBonus);
   });
 
-  it('rejects the same tag on two turns in a row (Tiredness)', () => {
+  it('lets a tired tag attack again, but later and weaker (Tiredness)', () => {
     const battle = battleOf(opp('boss'), opp('c1'), opp('c2'));
-    expect(simulate([a, b], battle, [{ tagIndex: 0, aimAt: 0 }, { tagIndex: 0, aimAt: 1 }])).toBeNull();
+    const r = simulate([a, b], battle, [{ tagIndex: 0, aimAt: 0 }, { tagIndex: 0, aimAt: 0 }])!;
+    expect(r).not.toBeNull();
+    expect(r.outcomes.map((o) => o.tired)).toEqual([false, true]);
+    expect(r.outcomes[1].damageDealt).toBeCloseTo(40 * MODEL.tiredAttackMultiplier);
+  });
+
+  it('makes a tired tag act after the opponent, even when it is faster', () => {
+    // The Boss knocks out any tag it hits; a fresh, faster tag defeats it first.
+    const hard = opp('boss', { stats: { attack: 5000, speed: 50, hp: 40 } });
+    const battle = battleOf(hard, opp('c1'), opp('c2'));
+    const fresh = simulate([a, b], battle, [{ tagIndex: 0, aimAt: 1 }, { tagIndex: 1, aimAt: 0 }])!;
+    expect(fresh.outcomes[1]).toMatchObject({ tagLost: false, tired: false });
+    const tired = simulate([a, b], battle, [{ tagIndex: 1, aimAt: 1 }, { tagIndex: 1, aimAt: 0 }])!;
+    expect(tired.outcomes[1]).toMatchObject({ tagLost: true, tired: true, damageDealt: 0 });
   });
 
   it('ends the battle when the Boss is defeated', () => {
@@ -76,7 +89,26 @@ describe('simulate', () => {
     expect(simulate([a, b], battle, [{ tagIndex: 0, aimAt: 1 }, { tagIndex: 1, aimAt: 1 }])).toBeNull();
   });
 
-  it('uses each kind of special move once per battle', () => {
+  it('does not spend a special move when the tag is knocked out before attacking', () => {
+    const z = { kind: 'zmove' as const, moveName: null, moveType: null };
+    const z1 = makeTag('z1', { gimmick: z });
+    const z2 = makeTag('z2', { gimmick: z });
+    const killer = opp('c1', { stats: { attack: 5000, speed: 999 } });
+    const battle = battleOf(opp('boss', { stats: { hp: 5000 } }), killer, opp('c2'));
+    const r = simulate([z1, z2], battle, [{ tagIndex: 0, aimAt: 1 }, { tagIndex: 1, aimAt: 0 }])!;
+    expect(r.outcomes.map((o) => o.usedGimmick)).toEqual([false, true]);
+  });
+
+  it('lets unlimited special moves (e.g. Double Move) trigger for every tag', () => {
+    const d = { kind: 'doubleMove' as const, moveName: null, moveType: null };
+    const d1 = makeTag('d1', { gimmick: d });
+    const d2 = makeTag('d2', { gimmick: d });
+    const battle = battleOf(opp('boss', { stats: { hp: 5000 } }), opp('c1'), opp('c2'));
+    const r = simulate([d1, d2], battle, [{ tagIndex: 0, aimAt: 0 }, { tagIndex: 1, aimAt: 0 }])!;
+    expect(r.outcomes.map((o) => o.usedGimmick)).toEqual([true, true]);
+  });
+
+  it('uses each limited special move (Mega, Dynamax, Z-Move) once per battle', () => {
     const z = { kind: 'zmove' as const, moveName: null, moveType: null };
     const z1 = makeTag('z1', { gimmick: z });
     const z2 = makeTag('z2', { gimmick: z });

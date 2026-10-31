@@ -14,11 +14,21 @@ describe('mechanics', () => {
   it('records that the player chooses which opponent to attack', () => {
     expect(MECHANICS.find((m) => m.id === 'choose-opponent')?.trust).toBe('player');
   });
+
+  it('records what the player saw about Tiredness', () => {
+    const tired = MECHANICS.find((m) => m.id === 'tiredness')!;
+    expect(tired.trust).toBe('player');
+    expect(tired.explanation).toMatch(/can still attack/);
+  });
 });
 
 describe('open questions', () => {
   it('has unique ids and starts with the lanes question', () => {
     expect(new Set(OPEN_QUESTIONS.map((q) => q.id)).size).toBe(OPEN_QUESTIONS.length);
     expect(OPEN_QUESTIONS[0].id).toBe('lanes');
+  });
+
+  it('no longer asks the Tiredness question the player answered', () => {
+    expect(OPEN_QUESTIONS.map((q) => q.id)).not.toContain('tired-speed');
   });
 });

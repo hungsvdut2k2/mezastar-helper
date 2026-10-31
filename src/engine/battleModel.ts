@@ -14,10 +14,18 @@ export const MODEL = {
     doubleMove: 1.8,
     chainAttack: 1.3,
   } satisfies Record<Gimmick, number>,
+  /**
+   * A tag that attacked last turn is tired: it acts after the opponent and loses the
+   * Attack Roulette boost. Estimate of how much weaker its hit is; not measured yet.
+   */
+  tiredAttackMultiplier: 0.8,
   targetDefeatBonus: 50, // beating the Boss target starts Catch Time
   lostTagPenalty: 40,
   maxTurns: 3,
 };
+
+/** Special moves the game limits to one use per battle ("per play" counts as per battle here). */
+export const LIMITED_GIMMICKS: ReadonlySet<Gimmick> = new Set<Gimmick>(['mega', 'dynamax', 'zmove']);
 
 /** opponents[0] is the Boss; [1] and [2] are the cronies. */
 export type Battle = { opponents: [Tag, Tag, Tag]; targetIndex: 0 | 1 | 2 };
@@ -29,6 +37,7 @@ export type TurnOutcome = {
   defeated: boolean;
   tagLost: boolean;
   usedGimmick: boolean;
+  tired: boolean; // this tag also attacked last turn
   supporters: number; // supporters active during this turn
 };
 
@@ -61,7 +70,9 @@ export function attacksFirst(attacker: Tag, defender: Tag): boolean {
 
 /**
  * Plays out a sequence of turns. Returns null if any turn is illegal:
- * same tag twice in a row, a knocked-out tag, or an already-defeated opponent.
+ * a missing or knocked-out tag, or an already-defeated opponent.
+ * A tag used two turns in a row is tired: it acts after the opponent and hits
+ * for MODEL.tiredAttackMultiplier of its damage.
  * Turns after the Boss is defeated are ignored (Catch Time has started).
  */
 export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult | null {
@@ -80,18 +91,23 @@ export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult 
     if (bossDefeated) break;
     const tag = team[turn.tagIndex];
     if (!tag || tagHp[turn.tagIndex] <= 0 || oppHp[turn.aimAt] <= 0) return null;
-    if (i > 0 && turns[i - 1].tagIndex === turn.tagIndex) return null;
+    const tired = i > 0 && turns[i - 1].tagIndex === turn.tagIndex;
 
     supporters += newSupporters;
     newSupporters = 0;
     const opp = battle.opponents[turn.aimAt];
     const kind = tag.gimmick?.kind;
-    const usedGimmick = kind !== undefined && !hasAttacked[turn.tagIndex] && !usedGimmicks.has(kind);
-    if (usedGimmick && kind) usedGimmicks.add(kind);
-    hasAttacked[turn.tagIndex] = true;
+    const canUseGimmick =
+      kind !== undefined && !hasAttacked[turn.tagIndex] && !(LIMITED_GIMMICKS.has(kind) && usedGimmicks.has(kind));
+    let usedGimmick = false;
 
     const hit = () => {
-      const dealt = Math.min(oppHp[turn.aimAt], damage(tag, opp, usedGimmick) + supporters * MODEL.supporterBonus);
+      // The special move is only spent when the tag actually attacks.
+      usedGimmick = canUseGimmick;
+      if (usedGimmick && kind) usedGimmicks.add(kind);
+      hasAttacked[turn.tagIndex] = true;
+      const base = damage(tag, opp, usedGimmick) * (tired ? MODEL.tiredAttackMultiplier : 1);
+      const dealt = Math.min(oppHp[turn.aimAt], base + supporters * MODEL.supporterBonus);
       oppHp[turn.aimAt] -= dealt;
       return dealt;
     };
@@ -100,7 +116,7 @@ export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult 
     };
 
     let dealt = 0;
-    if (attacksFirst(tag, opp)) {
+    if (!tired && attacksFirst(tag, opp)) {
       dealt = hit();
       if (oppHp[turn.aimAt] > 0) counter();
     } else {
@@ -114,7 +130,7 @@ export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult 
     if (turn.aimAt === battle.targetIndex) damageToTarget += dealt;
     if (defeated && turn.aimAt === 0) bossDefeated = true;
     if (defeated && turn.aimAt !== 0) newSupporters += 1;
-    outcomes.push({ turn, damageDealt: dealt, defeated, tagLost, usedGimmick, supporters });
+    outcomes.push({ turn, damageDealt: dealt, defeated, tagLost, usedGimmick, tired, supporters });
   }
 
   const targetDefeated = oppHp[battle.targetIndex] <= 0;

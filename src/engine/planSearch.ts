@@ -121,6 +121,7 @@ function searchedStep(team: Tag[], battle: Battle, o: TurnOutcome, index: number
     why = `Wears down ${opp.name} (not expected to fall this turn).`;
   }
   if (o.usedGimmick && tag.gimmick) why += ` First attack uses ${tag.gimmick.moveName ?? GIMMICK_NAME[tag.gimmick.kind]}.`;
+  if (o.tired) why += ' Tired: attacks later, no Roulette boost.';
   if (o.supporters > 0) why += ` ${o.supporters} supporter${o.supporters > 1 ? 's' : ''} add power.`;
   if (o.tagLost) why += ' Risky: this tag may be knocked out.';
   return {
