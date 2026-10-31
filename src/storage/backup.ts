@@ -1,4 +1,4 @@
-import type { PlayLogEntry, TagCorrection } from '../data/types';
+import { POKEMON_TYPES, type PlayLogEntry, type PokemonType, type TagCorrection } from '../data/types';
 import { replaceAll, type AppData } from './db';
 
 export const BACKUP_VERSION = 1;
@@ -15,14 +15,60 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 
 const isString = (v: unknown): v is string => typeof v === 'string';
 
+const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isType = (v: unknown): v is PokemonType => (POKEMON_TYPES as readonly unknown[]).includes(v);
+const isOneOf = (list: readonly string[]) => (v: unknown) => isString(v) && list.includes(v);
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
+/** A field that may be missing entirely. */
+const optional = (v: unknown, check: (x: unknown) => boolean) => v === undefined || check(v);
+
+const STAT_KEYS = ['hp', 'attack', 'defense', 'speed'];
+
+function isCorrection(v: unknown): v is TagCorrection {
+  if (!isObject(v)) return false;
+  const { grade, types, pokenergy, stats, move } = v;
+  return (
+    optional(grade, (g) => g === null || (Number.isInteger(g) && (g as number) >= 2 && (g as number) <= 6)) &&
+    optional(types, (t) => Array.isArray(t) && t.length >= 1 && t.length <= 2 && t.every(isType)) &&
+    optional(pokenergy, (p) => p === null || (isNumber(p) && p >= 0)) &&
+    optional(
+      stats,
+      (s) => isObject(s) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isNumber(x))),
+    ) &&
+    optional(move, (m) => m === null || (isObject(m) && isString(m.name) && isType(m.type)))
+  );
+}
+
+function isTurn(v: unknown): boolean {
+  return (
+    isObject(v) &&
+    isString(v.attacker) &&
+    optional(v.aimedAt, isString) &&
+    optional(v.defeated, isString) &&
+    optional(v.predictedDefeat, isBool)
+  );
+}
+
 function isLogEntry(v: unknown): v is PlayLogEntry {
   return (
     isObject(v) &&
     isString(v.id) &&
     isString(v.date) &&
+    optional(v.location, isString) &&
+    isOneOf(['battle', 'catchNow', 'specialTagBattle'])(v.mode) &&
     isString(v.boss) &&
-    Array.isArray(v.cronies) &&
-    Array.isArray(v.turns)
+    isStringArray(v.cronies) &&
+    isString(v.target) &&
+    isBool(v.superstarAppeared) &&
+    isStringArray(v.teamUsed) &&
+    Array.isArray(v.turns) &&
+    v.turns.every(isTurn) &&
+    (v.cronyDefeatedCount === 0 || v.cronyDefeatedCount === 1 || v.cronyDefeatedCount === 2) &&
+    isBool(v.bossDefeated) &&
+    optional(v.ballType, isOneOf(['poke', 'great', 'ultra', 'master'])) &&
+    (v.caught === null || isString(v.caught)) &&
+    optional(v.note, isString)
   );
 }
 
@@ -43,9 +89,11 @@ export function parseBackup(text: string): ParseResult {
   }
   const { owned, corrections, notes, log } = raw;
   if (!Array.isArray(owned) || !owned.every(isString)) return damaged('owned tags');
-  if (!isObject(corrections) || !Object.values(corrections).every(isObject)) return damaged('corrections');
+  if (!isObject(corrections) || !Object.values(corrections).every(isCorrection)) return damaged('corrections');
   if (!isObject(notes) || !Object.values(notes).every(isString)) return damaged('notes');
-  if (!Array.isArray(log) || !log.every(isLogEntry)) return damaged('play log');
+  if (!Array.isArray(log) || !log.every(isLogEntry) || new Set(log.map((e) => e.id)).size !== log.length) {
+    return damaged('play log');
+  }
   return {
     ok: true,
     data: {

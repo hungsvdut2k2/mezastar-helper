@@ -43,4 +43,69 @@ describe('backup', () => {
     expect(result.ok).toBe(false);
     expect((await loadAll()).owned).toEqual(['1-3-001']);
   });
+
+  describe('strict validation', () => {
+    const wrap = (parts: Record<string, unknown>) =>
+      JSON.stringify({ app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], ...parts });
+    const goodEntry = makeLogEntry();
+
+    it('accepts valid partial corrections and a full log entry', () => {
+      const corrections = {
+        a: { grade: null, types: ['fire', 'water'], pokenergy: 0, stats: { attack: 150, hp: null }, move: null },
+        b: { move: { name: 'Tackle', type: 'normal' } },
+        c: {},
+      };
+      const entry = makeLogEntry({ turns: [{ attacker: 'x', aimedAt: 'y', defeated: 'y', predictedDefeat: true }] });
+      expect(parseBackup(wrap({ corrections, log: [entry] })).ok).toBe(true);
+    });
+
+    it.each([
+      ['grade 7', { grade: 7 }],
+      ['grade 2.5', { grade: 2.5 }],
+      ['grade string', { grade: '3' }],
+      ['empty types', { types: [] }],
+      ['three types', { types: ['fire', 'water', 'grass'] }],
+      ['unknown type', { types: ['sparkle'] }],
+      ['negative pokenergy', { pokenergy: -1 }],
+      ['string pokenergy', { pokenergy: '5' }],
+      ['stats not an object', { stats: 5 }],
+      ['stat not a number', { stats: { attack: 'x' } }],
+      ['move without name', { move: { type: 'fire' } }],
+      ['move unknown type', { move: { name: 'X', type: 'sparkle' } }],
+      ['move not an object', { move: 'Tackle' }],
+    ])('rejects a correction with %s', (_name, bad) => {
+      const result = parseBackup(wrap({ corrections: { a: bad } }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('corrections');
+    });
+
+    it.each([
+      ['unknown mode', { mode: 'arena' }],
+      ['bad cronyDefeatedCount', { cronyDefeatedCount: 3 }],
+      ['non-boolean bossDefeated', { bossDefeated: 'no' }],
+      ['non-string cronies', { cronies: [1] }],
+      ['bad ball', { ballType: 'beast' }],
+      ['non-string caught', { caught: 5 }],
+      ['turn without attacker', { turns: [{}] }],
+      ['turn bad predictedDefeat', { turns: [{ attacker: 'a', predictedDefeat: 'yes' }] }],
+      ['non-string location', { location: 4 }],
+    ])('rejects a log entry with %s', (_name, bad) => {
+      const result = parseBackup(wrap({ log: [{ ...goodEntry, ...bad }] }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('play log');
+    });
+
+    it('rejects duplicate log ids', () => {
+      expect(parseBackup(wrap({ log: [goodEntry, goodEntry] })).ok).toBe(false);
+    });
+
+    it.each([
+      ['array notes', []],
+      ['non-string note', { a: 5 }],
+    ])('rejects %s', (_name, notes) => {
+      const result = parseBackup(wrap({ notes }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('notes');
+    });
+  });
 });
