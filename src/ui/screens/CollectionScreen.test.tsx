@@ -12,6 +12,19 @@ beforeEach(freshDb);
 
 const renderScreen = () => render(<WithStore>{(store) => <CollectionScreen store={store} />}</WithStore>);
 
+it('tells apart custom tags that share name, printed code and set', async () => {
+  const user = userEvent.setup();
+  await putCustomTag(makeTag('my-a', { name: 'Twin', printedCode: 'X-1' }));
+  await putCustomTag(makeTag('my-b', { name: 'Twin', printedCode: 'X-1' }));
+  renderScreen();
+  await user.selectOptions(await screen.findByLabelText('Set'), 'My tags');
+  await user.click(await screen.findByRole('button', { name: 'Owned: Twin (2) X-1, My tags' }));
+  expect(screen.getByRole('button', { name: 'Owned: Twin X-1, My tags' })).toHaveAttribute('aria-pressed', 'false');
+  expect((await loadAll()).owned).toEqual(['my-b']);
+  expect(screen.getByText('Twin (2)')).toBeInTheDocument();
+  expect(screen.getByText('Twin')).toBeInTheDocument();
+});
+
 it('toggles owned and keeps it after reopening', async () => {
   const user = userEvent.setup();
   const { unmount } = renderScreen();
