@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CollectionScreen } from './screens/CollectionScreen';
 import { GuideScreen } from './screens/GuideScreen';
 import { PlanScreen } from './screens/PlanScreen';
@@ -24,6 +24,15 @@ function Pane({ active, children }: { active: boolean; children: ReactNode }) {
 export function App() {
   const store = useAppData();
   const [tab, setTab] = useState<TabId>('play');
+
+  // The panes share one page, so a new tab would otherwise open at the old scroll position.
+  useEffect(() => {
+    try {
+      window.scrollTo(0, 0);
+    } catch {
+      // not implemented in every environment (e.g. jsdom)
+    }
+  }, [tab]);
 
   return (
     <div className="app">
