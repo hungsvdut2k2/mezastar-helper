@@ -24,5 +24,14 @@ describe('unknownOpponent', () => {
     const o = unknownOpponent('x');
     expect(o.name).toBe('Unknown crony');
     expect(Object.values(o.stats).every((v) => v === null)).toBe(true);
+    expect(o.types).toEqual([]); // no type: every matchup counts as neutral
+  });
+
+  it('can be planned against', () => {
+    const owned = ['a', 'b', 'c'].map((id) => makeTag(id));
+    const withUnknown: Battle = { opponents: [makeTag('boss'), unknownOpponent('u1'), unknownOpponent('u2')], targetIndex: 0 };
+    const [rec] = recommend(owned, withUnknown);
+    expect(rec.reason).toContain('Unknown crony (crony): Hit');
+    expect(rec.plan?.steps.length).toBeGreaterThan(0);
   });
 });

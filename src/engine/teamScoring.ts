@@ -1,5 +1,5 @@
-import type { Tag } from '../data/types';
-import { attackType, statOrNeutral, type Battle } from './battleModel';
+import type { Gimmick, Tag } from '../data/types';
+import { attackType, LIMITED_GIMMICKS, statOrNeutral, type Battle } from './battleModel';
 import { effectiveness, effectText } from './typeEffectiveness';
 
 /** Fixed weights for version 1. */
@@ -29,7 +29,9 @@ function soloScore(tag: Tag, battle: Battle): number {
 }
 
 export function rankTags(owned: Tag[], battle: Battle): Tag[] {
-  return [...owned].sort((a, b) => soloScore(b, battle) - soloScore(a, battle)).slice(0, WEIGHTS.poolSize);
+  return [...owned]
+    .sort((a, b) => soloScore(b, battle) - soloScore(a, battle) || a.id.localeCompare(b.id))
+    .slice(0, WEIGHTS.poolSize);
 }
 
 function bestAgainst(team: Tag[], opp: Tag): Tag {
@@ -67,13 +69,19 @@ export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
   const target = battle.opponents[battle.targetIndex];
   const top = hitPower(bestAgainst(team, target), target);
   const good = team.filter((t) => hitPower(t, target) >= WEIGHTS.goodAttackerShare * top).length;
-  if (good < 2) score -= WEIGHTS.rotationPenalty;
+  if (top <= 0 || good < 2) score -= WEIGHTS.rotationPenalty;
 
-  // 4–5. Defense and special moves
+  // 4–5. Defense and special moves. An opponent with no known move or type gives no resist points.
+  // Mega, Dynamax and Z-Move count once per team: only one can be used per battle.
+  const limitedSeen = new Set<Gimmick>();
   for (const t of team) {
     for (const opp of battle.opponents) score += WEIGHTS.resist * (1 - effectiveness(attackType(opp, false), t.types));
     score += (statOrNeutral(t.stats.hp) + statOrNeutral(t.stats.defense)) / WEIGHTS.bulkDivisor;
-    if (t.gimmick) score += WEIGHTS.gimmick;
+    const kind = t.gimmick?.kind;
+    if (kind && !limitedSeen.has(kind)) {
+      score += WEIGHTS.gimmick;
+      if (LIMITED_GIMMICKS.has(kind)) limitedSeen.add(kind);
+    }
   }
 
   const usesUnknownStats = [...team, ...battle.opponents].some(hasUnknownStats);

@@ -9,13 +9,13 @@ export function recommend(owned: Tag[], battle: Battle, count = 3): Recommendati
   return topTeams(owned, battle, count).map((t) => ({ ...t, plan: bestPlan(t.team, battle) }));
 }
 
-/** Stand-in for a crony the player did not enter (Plan screen). Normal type = neutral matchups. */
+/** Stand-in for a crony the player did not enter (Plan screen). No type and no move = neutral matchups. */
 export function unknownOpponent(id: string): Tag {
   return {
     id,
     name: 'Unknown crony',
     grade: null,
-    types: ['normal'],
+    types: [],
     pokenergy: null,
     stats: { hp: null, attack: null, defense: null, speed: null },
     move: null,

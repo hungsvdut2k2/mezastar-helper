@@ -52,9 +52,10 @@ export type SimResult = {
 
 export const statOrNeutral = (v: number | null): number => v ?? MODEL.neutralStat;
 
-export function attackType(tag: Tag, useGimmick: boolean): PokemonType {
+/** null when the tag has no known move or type (e.g. an unknown opponent): neutral matchups. */
+export function attackType(tag: Tag, useGimmick: boolean): PokemonType | null {
   if (useGimmick && tag.gimmick?.moveType) return tag.gimmick.moveType;
-  return tag.move?.type ?? tag.types[0];
+  return tag.move?.type ?? tag.types[0] ?? null;
 }
 
 export function damage(attacker: Tag, defender: Tag, useGimmick: boolean): number {

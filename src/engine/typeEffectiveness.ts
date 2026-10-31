@@ -1,7 +1,9 @@
 import { TYPE_CHART } from '../data/typeChart';
 import type { PokemonType } from '../data/types';
 
-export function effectiveness(moveType: PokemonType, defenderTypes: PokemonType[]): number {
+/** An unknown move type (null) or a defender with no known type counts as neutral (1). */
+export function effectiveness(moveType: PokemonType | null, defenderTypes: PokemonType[]): number {
+  if (moveType === null) return 1;
   return defenderTypes.reduce((m, t) => m * (TYPE_CHART[moveType][t] ?? 1), 1);
 }
 

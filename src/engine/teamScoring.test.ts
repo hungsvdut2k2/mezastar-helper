@@ -1,5 +1,6 @@
 import { makeTag } from '../test/factories';
 import type { Battle } from './battleModel';
+import { unknownOpponent } from './recommend';
 import { hitPower, rankTags, scoreTeam, topTeams, WEIGHTS } from './teamScoring';
 
 const fire = makeTag('fire', { move: { name: 'Ember', type: 'fire' } });
@@ -27,6 +28,11 @@ describe('rankTags', () => {
     expect(pool.map((t) => t.id)).not.toContain('t0');
     expect(pool[0].id).toBe('t19');
   });
+
+  it('breaks ties by tag id so the pool is always the same', () => {
+    const pool = rankTags([makeTag('b'), makeTag('c'), makeTag('a')], grassBossWaterCronies);
+    expect(pool.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('scoreTeam', () => {
@@ -40,6 +46,35 @@ describe('scoreTeam', () => {
     const twoGood = scoreTeam([fire, fire2, water], allGrass).score;
     const oneGood = scoreTeam([fire, water, water2], allGrass).score;
     expect(twoGood - oneGood).toBeCloseTo(WEIGHTS.rotationPenalty);
+  });
+
+  it('applies the rotation penalty when no tag can hit the target at all', () => {
+    const ghostBoss = makeTag('boss', { types: ['ghost'] });
+    const team = [makeTag('n1'), makeTag('n2')];
+    const cronies = [makeTag('c1'), makeTag('c2')] as const;
+    const bossTarget = scoreTeam(team, { opponents: [ghostBoss, ...cronies], targetIndex: 0 }).score;
+    const cronyTarget = scoreTeam(team, { opponents: [ghostBoss, ...cronies], targetIndex: 1 }).score;
+    // Coverage moves 100 points (the crony counts double instead of the Ghost Boss); the rest is the penalty.
+    expect(cronyTarget - bossTarget).toBeCloseTo(100 + WEIGHTS.rotationPenalty);
+  });
+
+  it('counts a limited special move (Z-Move) once per team, others for every tag', () => {
+    const z = (id: string) => makeTag(id, { gimmick: { kind: 'zmove', moveName: null, moveType: null } });
+    const d = (id: string) => makeTag(id, { gimmick: { kind: 'doubleMove', moveName: null, moveType: null } });
+    const base = scoreTeam([z('a'), makeTag('b'), normal], grassBossWaterCronies).score;
+    expect(scoreTeam([z('a'), z('b'), normal], grassBossWaterCronies).score).toBeCloseTo(base);
+    expect(scoreTeam([d('a'), d('b'), normal], grassBossWaterCronies).score).toBeCloseTo(base + WEIGHTS.gimmick);
+  });
+
+  it('treats an unknown crony as type-neutral', () => {
+    const ghostMove = makeTag('ghostMove', { move: { name: 'Lick', type: 'ghost' } });
+    const fightingMove = makeTag('fightingMove', { move: { name: 'Karate Chop', type: 'fighting' } });
+    const battle: Battle = {
+      opponents: [makeTag('boss', { types: ['fire'] }), unknownOpponent('u1'), unknownOpponent('u2')],
+      targetIndex: 0,
+    };
+    expect(hitPower(ghostMove, battle.opponents[1])).toBe(hitPower(fightingMove, battle.opponents[1]));
+    expect(scoreTeam([ghostMove], battle).score).toBeCloseTo(scoreTeam([fightingMove], battle).score);
   });
 
   it('says when stats are unknown', () => {
