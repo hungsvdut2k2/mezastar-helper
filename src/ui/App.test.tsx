@@ -17,6 +17,20 @@ it('opens on Play and switches screens from the tab bar', async () => {
   }
 });
 
+it('shows the top bar with the machine set and marks the current tab', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Play' });
+  const banner = screen.getByRole('banner');
+  expect(banner).toHaveTextContent('MEZASTAR HELPER');
+  expect(banner).toHaveTextContent('Machine set: Stardust V3');
+  const tabs = within(screen.getByRole('navigation', { name: 'Main' }));
+  expect(tabs.getByRole('button', { name: 'Play' })).toHaveAttribute('aria-current', 'page');
+  await user.click(tabs.getByRole('button', { name: 'Stats' }));
+  expect(tabs.getByRole('button', { name: 'Stats' })).toHaveAttribute('aria-current', 'page');
+  expect(tabs.getByRole('button', { name: 'Play' })).not.toHaveAttribute('aria-current');
+});
+
 it('scrolls to the top when the tab changes', async () => {
   const user = userEvent.setup();
   const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});

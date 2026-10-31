@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'Mezastar Helper',
         short_name: 'Mezastar',
         description: 'Catch more Superstar Pokémon in Mezastar Stardust Version 3',
-        theme_color: '#1d3557',
-        background_color: '#ffffff',
+        theme_color: '#6e0a1a',
+        background_color: '#0b1020',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
