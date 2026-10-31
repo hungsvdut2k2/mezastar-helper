@@ -21,7 +21,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 - Source: https://world.pokemonmezastar.com/sg/tag/28933/
 - Release period: not stated on the site
 - Total tags recorded: 70
-- Notes: No Regular Tags are listed on the V1 page (R-1-x tags appear from V2). Page notes Ga-Olé Lucky Star Disks only work with V1. Zacian/Zamazenta types assume Crowned forms (Behemoth moves); the page does not name the form.
+- Notes: No Regular Tags are listed on the V1 page (R-1-x tags appear from V2). Page notes Ga-Olé Lucky Star Disks only work with V1. Zacian/Zamazenta types assume Crowned forms (Behemoth moves); the page does not name the form. 1-1-009 is recorded as fire/dragon (Mega Charizard X's typing, as the page's Mega section names Mega Charizard X).
 
 | code | name | grade | types | move | gimmick | flags | confidence |
 |---|---|---|---|---|---|---|---|
@@ -33,7 +33,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 | 1-1-006 | Metagross | 6 | steel, psychic | - | - | - | official |
 | 1-1-007 | Miraidon | 6 | electric, dragon | Electro Drift (electric) | - | legendary | official |
 | 1-1-008 | Venusaur | 6 | grass, poison | - | Mega Venusaur: Leaf Storm (grass) | - | official |
-| 1-1-009 | Charizard | 6 | fire, flying | - | Mega Charizard X: Flamethrower (fire) | - | official |
+| 1-1-009 | Charizard | 6 | fire, dragon | - | Mega Charizard X: Flamethrower (fire) | - | official |
 | 1-1-010 | Blastoise | 6 | water | - | Mega Blastoise: Hydro Pump (water) | - | official |
 | 1-1-011 | Vaporeon | 5 | water | - | - | - | official |
 | 1-1-012 | Flareon | 5 | fire | - | - | - | official |
@@ -192,8 +192,8 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 | 1-4-002 | Palkia | 6 | water, dragon | Spacial Rend (dragon) | - | legendary | official |
 | 1-4-003 | Xerneas | 6 | fairy | Moonblast (fairy) | Dynamax: Max Starfall (fairy) | legendary | official |
 | 1-4-004 | Yveltal | 6 | dark, flying | Dark Pulse (dark) | Dynamax: Max Darkness (dark) | legendary | official |
-| 1-4-005 | Calyrex (Ice Rider) | 6 | psychic, ice | Glacial Lance (ice) | Dynamax: Max Hailstorm (ice) | legendary | official |
-| 1-4-006 | Calyrex (Shadow Rider) | 6 | psychic, ghost | Astral Barrage (ghost) | Dynamax: Max Phantasm (ghost) | legendary | official |
+| 1-4-005 | Calyrex (Ice Rider) | 6 | psychic, ice | Glacial Lance (ice) | Dynamax: Max Hailstorm (ice) | legendary | community |
+| 1-4-006 | Calyrex (Shadow Rider) | 6 | psychic, ghost | Astral Barrage (ghost) | Dynamax: Max Phantasm (ghost) | legendary | community |
 | 1-4-007 | Mimikyu | 6 | ghost, fairy | Play Rough (fairy) | Z-Move: Let's Snuggle Forever (fairy) | - | official |
 | 1-4-008 | Kyurem | 6 | dragon, ice | - | - | legendary | official |
 | 1-4-009 | Kyurem | 6 | dragon, ice | - | - | legendary | official |
@@ -510,6 +510,10 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 | R-2-1 | Pikachu | ? | electric | - | Gigantamax-capable (G-Max move not listed) | - | official |
 | R-2-2 | Charizard | ? | fire, flying | - | Gigantamax-capable (G-Max move not listed) | - | official |
 | R-2-3 | Gengar | ? | ghost, poison | - | Gigantamax-capable (G-Max move not listed) | - | official |
+
+## Spot-check against the live pages (build step)
+
+Re-read all six pages: codes and names for 001-030 and 041-070 (all sets, sampled ranges 031-059 too) matched, as did every feature section (moves and types). Corrections: Mega Charizard X typing (1-1-009 fire/dragon); Calyrex Ice/Shadow code mapping is not on the page (confidence lowered to community). Confirmed unresolved: both 1-4-008/009 are plain "Kyurem" with no form on the page (kept as base Kyurem dragon/ice, no Black/White); Toxtricity 2-1-021/022/060 forms are not mapped to codes; Regigigas and Obstagoon (2-3-006/010) "also appear" in the Double Move section with no move names, so the app records no gimmick for them. Regular Tags: the page's Dynamax/Gigantamax text names no moves.
 
 ## Open gaps
 
