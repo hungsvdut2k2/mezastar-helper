@@ -2,15 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import type { Tag } from '../../data/types';
 import { printedCode, setLabel } from '../../data/setInfo';
 import { gradeLabel, searchTags } from '../format';
+import { TagCard, type TagCardSize } from './TagCard';
 
-type Props = { label: string; tags: Tag[]; value: Tag | null; onChange: (tag: Tag | null) => void };
+type Props = {
+  label: string;
+  tags: Tag[];
+  value: Tag | null;
+  onChange: (tag: Tag | null) => void;
+  /** How big the chosen tag is shown. Results are always small cards. */
+  cardSize?: TagCardSize;
+  /** The player's tag photos (tag id → object URL). */
+  photos?: ReadonlyMap<string, string>;
+};
 
 const MAX_RESULTS = 8;
 
-/** Code, grade and set, so the same Pokémon in different sets can be told apart. */
-const tagLabel = (t: Tag) => [printedCode(t), gradeLabel(t.grade), setLabel(t)].filter(Boolean).join(' ');
+/** Name, code, grade and set: the accessible name each result had before it became a card. */
+const resultName = (t: Tag) => [t.name, printedCode(t), gradeLabel(t.grade), setLabel(t)].filter(Boolean).join(' ');
 
-export function TagPicker({ label, tags, value, onChange }: Props) {
+export function TagPicker({ label, tags, value, onChange, cardSize = 'small', photos }: Props) {
   const [query, setQuery] = useState('');
   const chipRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +47,11 @@ export function TagPicker({ label, tags, value, onChange }: Props) {
             onChange(null);
           }}
         >
-          {value.name} <small>{tagLabel(value)}</small> ✕
+          {/* The card shows code, grade and set, so the same Pokémon in different sets can be told apart. */}
+          <TagCard tag={value} size={cardSize} photoUrl={photos?.get(value.id)} />
+          <span className="chip-x" aria-hidden="true">
+            ✕
+          </span>
         </button>
       </div>
     );
@@ -76,13 +90,14 @@ export function TagPicker({ label, tags, value, onChange }: Props) {
           <button
             key={t.id}
             type="button"
+            aria-label={resultName(t)}
             onClick={() => {
               moveFocusTo.current = 'chip';
               onChange(t);
               setQuery('');
             }}
           >
-            {t.name} <small>{tagLabel(t)}</small>
+            <TagCard tag={t} size="small" photoUrl={photos?.get(t.id)} />
           </button>
         ))}
       </div>

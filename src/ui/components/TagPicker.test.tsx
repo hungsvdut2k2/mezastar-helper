@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -6,9 +7,9 @@ import type { Tag } from '../../data/types';
 import { searchTags } from '../format';
 import { TagPicker } from './TagPicker';
 
-function Harness() {
+function Harness(props: Partial<React.ComponentProps<typeof TagPicker>>) {
   const [value, setValue] = useState<Tag | null>(null);
-  return <TagPicker label="Boss" tags={TAGS} value={value} onChange={setValue} />;
+  return <TagPicker label="Boss" tags={TAGS} value={value} onChange={setValue} {...props} />;
 }
 
 it('shows matches for a name and picks one', async () => {
@@ -69,4 +70,17 @@ it('says how many matches are hidden when results are truncated', async () => {
   await user.type(screen.getByLabelText('Boss'), '01');
   expect(screen.getByLabelText('Boss')).toHaveValue('1-3-001');
   expect(screen.getByText('1 match')).toBeInTheDocument();
+});
+
+it('shows results as small cards and the chosen tag as a card of the asked size, with the player photo', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<Harness cardSize="large" photos={new Map([['1-3-001', 'blob:lugia']])} />);
+  await user.type(screen.getByLabelText('Boss'), 'Lugia');
+  const result = screen.getByRole('button', { name: 'Lugia 1-3-001 6★ Stardust V3' });
+  expect(result.querySelector('.tc-small')).toBeInTheDocument();
+  await user.click(result);
+  const chip = screen.getByRole('button', { name: 'Clear Boss' });
+  expect(chip.querySelector('.tc-large')).toBeInTheDocument();
+  expect(chip.querySelector('img')).toHaveAttribute('src', 'blob:lugia');
+  expect(container.querySelectorAll('img[alt=""]')).toHaveLength(1);
 });

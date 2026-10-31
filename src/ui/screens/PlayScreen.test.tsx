@@ -25,7 +25,7 @@ async function enterBattle() {
 it('recommends a team and plan once all three opponents are entered', async () => {
   await enterBattle();
   expect(screen.getByText(/^Team 1:/)).toBeInTheDocument();
-  expect(screen.getAllByText(/^Turn 1:/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/^Turn 1$/).length).toBeGreaterThan(0);
 });
 
 it('lets the player switch the target to a crony', async () => {

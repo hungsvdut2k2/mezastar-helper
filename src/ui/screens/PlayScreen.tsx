@@ -85,9 +85,12 @@ export function PlayScreen({ store }: { store: AppStore }) {
         <p className="notice">Community tip: "Catch now!" rarely gives Superstars. A full battle is usually better.</p>
       )}
       <p className="hint">Enter the 3 Pokémon on the screen.</p>
-      {SLOTS.map((label, i) => (
-        <TagPicker key={label} label={label} tags={store.tags} value={picked[i]} onChange={pick(i)} />
-      ))}
+      <TagPicker label={SLOTS[0]} tags={store.tags} value={boss} onChange={pick(0)} cardSize="large" photos={store.photos} />
+      <div className="slot-row">
+        {[1, 2].map((i) => (
+          <TagPicker key={SLOTS[i]} label={SLOTS[i]} tags={store.tags} value={picked[i]} onChange={pick(i)} cardSize="medium" photos={store.photos} />
+        ))}
+      </div>
       {picked.some(Boolean) && (
         <>
           <h2 id="play-target">Which one do you want to catch?</h2>
@@ -108,7 +111,7 @@ export function PlayScreen({ store }: { store: AppStore }) {
           )}
         </>
       )}
-      {battle && <Recommendations owned={owned} battle={battle} onUseTeam={setLogging} />}
+      {battle && <Recommendations owned={owned} battle={battle} onUseTeam={setLogging} photos={store.photos} />}
     </section>
   );
 }

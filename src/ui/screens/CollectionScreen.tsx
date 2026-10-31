@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MY_TAGS_ID, isCustomId, printedCode, setLabel } from '../../data/setInfo';
 import { TAGS } from '../../data/tags';
 import type { Tag } from '../../data/types';
+import { TagCard } from '../components/TagCard';
 import { gradeLabel, searchTags, typeLabel } from '../format';
 import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setChoices';
 import type { AppStore } from '../useAppData';
@@ -175,9 +176,15 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               >
                 {isOwned ? '✓' : ''}
               </button>
-              {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt="" width={44} height={44} loading="lazy" decoding="async" />}
-              <button type="button" className="tag-row" data-row-id={t.id} onClick={() => setEditingId(t.id)}>
-                <strong>{labelOf(t)}</strong> <small>{`${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
+              <button
+                type="button"
+                className="tag-row"
+                data-row-id={t.id}
+                // The same name the row had as plain text, so it stays stable for screen reader users.
+                aria-label={`${labelOf(t)} ${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}
+                onClick={() => setEditingId(t.id)}
+              >
+                <TagCard tag={t} size="small" name={labelOf(t)} meta={`${printedCode(t)} · ${setLabel(t)}`} photoUrl={store.photos.get(t.id)} />
               </button>
             </li>
           );

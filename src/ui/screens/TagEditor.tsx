@@ -4,6 +4,7 @@ import { printedCode, setLabel } from '../../data/setInfo';
 import { gradeLabel, typeLabel } from '../format';
 import type { Rasterizer } from '../photo';
 import { PhotoSection } from './PhotoSection';
+import { TagCard } from '../components/TagCard';
 
 type Props = {
   /** The tag as the player currently sees it (shipped data plus any earlier correction). */
@@ -101,9 +102,18 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
       <button type="button" className="link" onClick={onClose}>
         ‹ Back
       </button>
-      <h1 ref={heading} tabIndex={-1}>
-        {tag.name} <small>{printedCode(tag)}</small>
-      </h1>
+      <TagCard
+        as="div"
+        size="large"
+        tag={tag}
+        photoUrl={photoUrl}
+        meta={null}
+        title={
+          <h1 ref={heading} tabIndex={-1}>
+            {tag.name} <small>{printedCode(tag)}</small>
+          </h1>
+        }
+      />
       <p>
         {setLabel(tag) && `${setLabel(tag)} · `}
         {gradeLabel(tag.grade)}
