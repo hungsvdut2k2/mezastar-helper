@@ -54,8 +54,11 @@ export function TagPicker({ label, tags, value, onChange }: Props) {
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
-      <div className="picker-results" aria-live="polite">
-        {searching && matches.length === 0 && <p className="hint">No matching tag</p>}
+      {/* Only this short message is announced, never the whole button list. */}
+      <p className="hint picker-status" aria-live="polite">
+        {searching ? (matches.length === 0 ? 'No matching tag' : `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`) : ''}
+      </p>
+      <div className="picker-results">
         {matches.map((t) => (
           <button
             key={t.id}

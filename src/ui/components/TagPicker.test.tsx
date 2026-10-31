@@ -26,11 +26,17 @@ it('says so when nothing matches', async () => {
   expect(screen.getByText('No matching tag')).toBeInTheDocument();
 });
 
-it('announces results politely', async () => {
+it('announces only a short results count, not the whole button list', async () => {
   const user = userEvent.setup();
   const { container } = render(<Harness />);
+  const live = container.querySelector('[aria-live="polite"]')!;
+  expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
   await user.type(screen.getByLabelText('Boss'), 'Lugia');
-  expect(container.querySelector('[aria-live="polite"]')).toContainElement(screen.getByRole('button', { name: /^Lugia/ }));
+  expect(live).toHaveTextContent(/^\d+ match(es)?$/);
+  expect(live).not.toContainElement(screen.getByRole('button', { name: /^Lugia/ }));
+  await user.clear(screen.getByLabelText('Boss'));
+  await user.type(screen.getByLabelText('Boss'), 'zzzzqq');
+  expect(live).toHaveTextContent('No matching tag');
 });
 
 it('turns off autocorrect, autocapitalize and spellcheck on the input', () => {
