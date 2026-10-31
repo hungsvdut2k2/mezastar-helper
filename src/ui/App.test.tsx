@@ -122,9 +122,9 @@ it('shows a correction made in Collection on the Plan target chip', async () => 
   const tabs = within(screen.getByRole('navigation', { name: 'Main' }));
   await user.click(tabs.getByRole('button', { name: 'Plan' }));
   await user.click(pane('Plan').getByRole('button', { name: 'Lugia 1-3-001' }));
-  expect(pane('Plan').getByRole('button', { name: 'Clear Target' })).toHaveTextContent('1-3-001 6★');
+  expect(pane('Plan').getByRole('group', { name: /^Target: Lugia/ })).toHaveTextContent('1-3-001 6★');
 
   await correct(user, 'Lugia', 'Grade', '5★');
   await user.click(tabs.getByRole('button', { name: 'Plan' }));
-  expect(pane('Plan').getByRole('button', { name: 'Clear Target' })).toHaveTextContent('1-3-001 5★');
+  expect(pane('Plan').getByRole('group', { name: /^Target: Lugia/ })).toHaveTextContent('1-3-001 5★');
 });

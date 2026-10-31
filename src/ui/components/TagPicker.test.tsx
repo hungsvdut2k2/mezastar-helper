@@ -17,7 +17,7 @@ it('shows matches for a name and picks one', async () => {
   render(<Harness />);
   await user.type(screen.getByLabelText('Boss'), 'Lugia');
   await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
-  expect(screen.getByRole('button', { name: 'Clear Boss' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Clear Boss: Lugia 1-3-001$/ })).toBeInTheDocument();
 });
 
 it('says so when nothing matches', async () => {
@@ -54,8 +54,8 @@ it('moves focus to the chosen tag, and back to the input after clearing', async 
   render(<Harness />);
   await user.type(screen.getByLabelText('Boss'), 'Lugia');
   await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
-  expect(screen.getByRole('button', { name: 'Clear Boss' })).toHaveFocus();
-  await user.click(screen.getByRole('button', { name: 'Clear Boss' }));
+  expect(screen.getByRole('button', { name: /^Clear Boss/ })).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: /^Clear Boss/ }));
   expect(screen.getByLabelText('Boss')).toHaveFocus();
 });
 
@@ -79,8 +79,18 @@ it('shows results as small cards and the chosen tag as a card of the asked size,
   const result = screen.getByRole('button', { name: 'Lugia 1-3-001 6★ Stardust V3' });
   expect(result.querySelector('.tc-small')).toBeInTheDocument();
   await user.click(result);
-  const chip = screen.getByRole('button', { name: 'Clear Boss' });
+  const chip = screen.getByRole('group', { name: 'Boss: Lugia 1-3-001' });
   expect(chip.querySelector('.tc-large')).toBeInTheDocument();
   expect(chip.querySelector('img')).toHaveAttribute('src', 'blob:lugia');
   expect(container.querySelectorAll('img[alt=""]')).toHaveLength(1);
+});
+
+it('does not clear the pick when the card itself is tapped', async () => {
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.type(screen.getByLabelText('Boss'), 'Lugia');
+  await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.click(screen.getByText('Lugia'));
+  expect(screen.getByRole('group', { name: 'Boss: Lugia 1-3-001' })).toBeInTheDocument();
+  expect(screen.queryByLabelText('Boss', { selector: 'input' })).not.toBeInTheDocument();
 });

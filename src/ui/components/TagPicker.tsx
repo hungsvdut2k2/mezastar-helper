@@ -34,25 +34,27 @@ export function TagPicker({ label, tags, value, onChange, cardSize = 'small', ph
   }, [value]);
 
   if (value) {
+    const chosen = `${value.name} ${printedCode(value)}`;
     return (
       <div className="picker">
         <span className="picker-label">{label}</span>
-        <button
-          ref={chipRef}
-          type="button"
-          className="chip"
-          aria-label={`Clear ${label}`}
-          onClick={() => {
-            moveFocusTo.current = 'input';
-            onChange(null);
-          }}
-        >
+        {/* The card is plain content: only the separate ✕ button clears, so a stray tap cannot drop the pick. */}
+        <div className="chip" role="group" aria-label={`${label}: ${chosen}`}>
           {/* The card shows code, grade and set, so the same Pokémon in different sets can be told apart. */}
           <TagCard tag={value} size={cardSize} photoUrl={photos?.get(value.id)} />
-          <span className="chip-x" aria-hidden="true">
-            ✕
-          </span>
-        </button>
+          <button
+            ref={chipRef}
+            type="button"
+            className="chip-x"
+            aria-label={`Clear ${label}: ${chosen}`}
+            onClick={() => {
+              moveFocusTo.current = 'input';
+              onChange(null);
+            }}
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
       </div>
     );
   }
