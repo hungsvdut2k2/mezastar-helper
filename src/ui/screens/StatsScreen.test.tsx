@@ -127,6 +127,16 @@ describe('restore', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('This backup has no photos — all 2 of your tag photos will be deleted.');
   });
 
+  it('warns that photos may be deleted when they could not be read at startup', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockRejectedValue(new Error('unreadable'));
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), backupFile());
+    await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Your existing tag photos may be deleted.');
+    expect(screen.queryByText(/It will replace your 0 tag photos/)).not.toBeInTheDocument();
+  });
+
   it('does not warn when there are no photos to lose', async () => {
     await pickBackup();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

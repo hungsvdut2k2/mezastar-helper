@@ -421,57 +421,82 @@ describe('photos', () => {
     JSON.stringify({ app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], photos });
   const png = `data:image/png;base64,${btoa('hello')}`;
 
-  it('does not apply or keep a photo whose save finishes after a restore', async () => {
-    const user = userEvent.setup();
-    let finish!: () => void;
-    vi.spyOn(dbModule, 'putPhoto').mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
-    const results: boolean[] = [];
+  type Store = import('./useAppData').AppStore;
+  /** Renders the store for real and hands it to the test; photo ids on screen are listed in the page. */
+  async function renderStore() {
+    let current!: Store;
     render(
       <WithStore>
-        {(store) => (
-          <>
-            <Probe store={store} />
-            <button type="button" onClick={async () => void results.push(await store.setPhoto('1-3-001', blob('late')))}>late</button>
-            <button type="button" onClick={() => store.restore(backupText({ '1-3-002': png }))}>restore</button>
-          </>
-        )}
+        {(store) => {
+          current = store;
+          return <p data-testid="ids">{[...store.photos.keys()].sort().join(',') || 'none'}</p>;
+        }}
       </WithStore>,
     );
-    await user.click(await screen.findByRole('button', { name: 'late' }));
-    await user.click(screen.getByRole('button', { name: 'restore' }));
-    await waitFor(() => expect(created).toHaveLength(1)); // the restored photo
-    await act(async () => finish());
-    await waitFor(() => expect(results).toEqual([false]));
-    expect(screen.getByTestId('url')).toHaveTextContent('none');
-    expect(created).toHaveLength(1);
+    await screen.findByTestId('ids');
+    return () => current;
+  }
+  const storedIds = async () => Object.keys(await getAllPhotos()).sort();
+
+  it('a photo save started before a restore is replaced by it, on screen and in storage', async () => {
+    const store = await renderStore();
+    let results!: [boolean, unknown];
+    await act(async () => {
+      const saved = store().setPhoto('1-3-001', blob('early'));
+      const restored = store().restore(backupText({ '1-3-002': png }));
+      results = [await saved, await restored];
+    });
+    expect(results[0]).toBe(true);
+    expect(await storedIds()).toEqual(['1-3-002']);
+    expect(screen.getByTestId('ids')).toHaveTextContent('1-3-002');
+    expect(screen.getByTestId('ids').textContent).toBe((await storedIds()).join(','));
   });
 
-  it('does not apply a photo removal that finishes after a restore', async () => {
-    const user = userEvent.setup();
-    await dbModule.putPhoto('1-3-002', blob('x'));
-    let finish!: () => void;
-    vi.spyOn(dbModule, 'deletePhoto').mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
-    const results: boolean[] = [];
-    function Urls({ store }: { store: import('./useAppData').AppStore }) {
-      return <p data-testid="ids">{[...store.photos.keys()].join(',') || 'none'}</p>;
-    }
-    render(
-      <WithStore>
-        {(store) => (
-          <>
-            <Urls store={store} />
-            <button type="button" onClick={async () => void results.push(await store.removePhoto('1-3-002'))}>rm</button>
-            <button type="button" onClick={() => store.restore(backupText({ '1-3-002': png }))}>restore</button>
-          </>
-        )}
-      </WithStore>,
-    );
-    await user.click(await screen.findByRole('button', { name: 'rm' }));
-    await user.click(screen.getByRole('button', { name: 'restore' }));
-    await waitFor(() => expect(created).toHaveLength(2)); // loaded, then restored
-    await act(async () => finish());
-    await waitFor(() => expect(results).toEqual([false]));
+  it('a photo save started after a restore is kept, on screen and in storage', async () => {
+    const store = await renderStore();
+    await act(async () => {
+      const restored = store().restore(backupText({ '1-3-002': png }));
+      const saved = store().setPhoto('1-3-001', blob('late'));
+      await Promise.all([restored, saved]);
+    });
+    expect(await storedIds()).toEqual(['1-3-001', '1-3-002']);
+    expect(screen.getByTestId('ids')).toHaveTextContent('1-3-001,1-3-002');
+  });
+
+  it('a photo removal started before a restore does not undo the restored photo', async () => {
+    await putPhoto('1-3-002', blob('x'));
+    const store = await renderStore();
+    await act(async () => {
+      const removed = store().removePhoto('1-3-002');
+      const restored = store().restore(backupText({ '1-3-002': png }));
+      await Promise.all([removed, restored]);
+    });
+    expect(await storedIds()).toEqual(['1-3-002']);
     expect(screen.getByTestId('ids')).toHaveTextContent('1-3-002');
+  });
+
+  it('a photo removal started after a restore removes the restored photo everywhere', async () => {
+    const store = await renderStore();
+    await act(async () => {
+      const restored = store().restore(backupText({ '1-3-002': png }));
+      const removed = store().removePhoto('1-3-002');
+      await Promise.all([restored, removed]);
+    });
+    expect(await storedIds()).toEqual([]);
+    expect(screen.getByTestId('ids')).toHaveTextContent('none');
+  });
+
+  it('a failed photo save does not block the operations queued behind it', async () => {
+    vi.spyOn(dbModule, 'putPhoto').mockRejectedValueOnce(new Error('disk full'));
+    const store = await renderStore();
+    const results: boolean[] = [];
+    await act(async () => {
+      results.push(await store().setPhoto('1-3-001', blob('a')));
+      results.push(await store().setPhoto('1-3-003', blob('b')));
+    });
+    expect(results).toEqual([false, true]);
+    expect(await storedIds()).toEqual(['1-3-003']);
+    expect(screen.getByTestId('ids')).toHaveTextContent('1-3-003');
   });
 
   it('creates no object URL for a photo saved after unmount', async () => {

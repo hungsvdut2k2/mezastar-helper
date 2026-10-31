@@ -213,7 +213,14 @@ export function StatsScreen({ store }: { store: AppStore }) {
           <p>
             {`This backup is from ${pending.exportedAt ? localDate(pending.exportedAt) : 'an unknown date'}: ${plural(pending.data.log.length, 'play')}, ${plural(pending.data.owned.length, 'owned tag')}. It will REPLACE your current ${plural(store.data.log.length, 'play')} and ${plural(store.data.owned.length, 'owned tag')}.`}
           </p>
-          <p>{`It will replace your ${plural(store.photos.size, 'tag photo')} with the backup's ${pending.photoCount}.`}</p>
+          {!store.photosLoadFailed && (
+            <p>{`It will replace your ${plural(store.photos.size, 'tag photo')} with the backup's ${pending.photoCount}.`}</p>
+          )}
+          {store.photosLoadFailed && (
+            <p className="error" role="alert">
+              <strong>Your existing tag photos may be deleted.</strong>
+            </p>
+          )}
           {pending.photoCount === 0 && store.photos.size > 0 && (
             <p className="error" role="alert">
               <strong>{`This backup has no photos — all ${store.photos.size} of your tag photos will be deleted.`}</strong>

@@ -35,25 +35,34 @@ export function useAppData() {
   const syncPhotos = () => setPhotosState(new Map(photoUrls.current));
   // False once the app is gone: async work that finishes later must not leave object URLs behind.
   const alive = useRef(false);
-  // Counts completed restores. A photo change that began before one must not touch the restored photos.
-  const restoreGeneration = useRef(0);
+  // Photo changes, custom-tag changes and restores run one after another, so the stored data and the screen
+  // cannot disagree about which of them happened last. A failed step never stops the ones queued behind it.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  function enqueue<T>(op: () => Promise<T>): Promise<T> {
+    const result = queue.current.then(op);
+    queue.current = result.catch(() => {});
+    return result;
+  }
   /** Show exactly these photos; every previous object URL is revoked. */
   const replacePhotoUrls = (blobs: Record<string, Blob>) => {
     for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
     photoUrls.current = alive.current ? new Map(Object.entries(blobs).map(([id, blob]) => [id, URL.createObjectURL(blob)])) : new Map();
     if (alive.current) syncPhotos();
   };
+  // True when the stored photos could not be read at startup, so how many there are is unknown.
+  const [photosLoadFailed, setPhotosLoadFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     alive.current = true;
     const stopBlockedWatch = db.onDbBlocked(() => setError(BLOCKED_MESSAGE));
-    Promise.all([db.loadAll(), db.getAllPhotos().catch(() => ({}) as Record<string, Blob>)])
+    Promise.all([db.loadAll(), db.getAllPhotos().catch(() => null)])
       .then(([loadedData, blobs]) => {
         if (!alive.current) return;
         setData(loadedData);
-        replacePhotoUrls(blobs);
+        replacePhotoUrls(blobs ?? {});
+        setPhotosLoadFailed(blobs === null);
         // The upgrade was only waiting for another tab: all fine now.
         setError((e) => (e === BLOCKED_MESSAGE ? null : e));
       })
@@ -118,40 +127,40 @@ export function useAppData() {
     loaded,
     error,
     photos,
+    photosLoadFailed,
     dismissError: () => setError(null),
     /** Save an already-processed photo. The picture appears once it is stored. */
     async setPhoto(id: string, blob: Blob): Promise<boolean> {
-      const generation = restoreGeneration.current;
-      try {
-        await db.putPhoto(id, blob);
-      } catch {
-        if (alive.current) setError('Your photo was not saved.');
-        return false;
-      }
-      // A restore finished meanwhile: it decides what the photos are now.
-      if (generation !== restoreGeneration.current) return false;
-      if (!alive.current) return true;
-      const old = photoUrls.current.get(id);
-      photoUrls.current.set(id, URL.createObjectURL(blob));
-      if (old) URL.revokeObjectURL(old);
-      syncPhotos();
-      return true;
+      return enqueue(async () => {
+        try {
+          await db.putPhoto(id, blob);
+        } catch {
+          if (alive.current) setError('Your photo was not saved.');
+          return false;
+        }
+        if (!alive.current) return true;
+        const old = photoUrls.current.get(id);
+        photoUrls.current.set(id, URL.createObjectURL(blob));
+        if (old) URL.revokeObjectURL(old);
+        syncPhotos();
+        return true;
+      });
     },
     async removePhoto(id: string): Promise<boolean> {
-      const generation = restoreGeneration.current;
-      try {
-        await db.deletePhoto(id);
-      } catch {
-        if (alive.current) setError('Your photo was not removed.');
-        return false;
-      }
-      if (generation !== restoreGeneration.current) return false;
-      if (!alive.current) return true;
-      const old = photoUrls.current.get(id);
-      photoUrls.current.delete(id);
-      if (old) URL.revokeObjectURL(old);
-      syncPhotos();
-      return true;
+      return enqueue(async () => {
+        try {
+          await db.deletePhoto(id);
+        } catch {
+          if (alive.current) setError('Your photo was not removed.');
+          return false;
+        }
+        if (!alive.current) return true;
+        const old = photoUrls.current.get(id);
+        photoUrls.current.delete(id);
+        if (old) URL.revokeObjectURL(old);
+        syncPhotos();
+        return true;
+      });
     },
     /** All stored photos as data URLs, for a backup file. */
     async exportPhotos(): Promise<Record<string, string>> {
@@ -160,40 +169,44 @@ export function useAppData() {
       return Object.fromEntries(entries);
     },
     /** Add or replace a player-made tag. Shown only once it is stored, so a failed save leaves no ghost tag. */
-    async saveCustomTag(tag: Tag): Promise<boolean> {
-      try {
-        await db.putCustomTag(tag);
-      } catch {
-        setError('Your tag was not saved.');
-        return false;
-      }
-      setData({
-        ...latest.current,
-        customTags: [...latest.current.customTags.filter((t) => t.id !== tag.id), tag].sort((a, b) => a.id.localeCompare(b.id)),
+    saveCustomTag(tag: Tag): Promise<boolean> {
+      return enqueue(async () => {
+        try {
+          await db.putCustomTag(tag);
+        } catch {
+          setError('Your tag was not saved.');
+          return false;
+        }
+        setData({
+          ...latest.current,
+          customTags: [...latest.current.customTags.filter((t) => t.id !== tag.id), tag].sort((a, b) => a.id.localeCompare(b.id)),
+        });
+        return true;
       });
-      return true;
     },
     /** Delete a player-made tag with its owned flag, correction and photo. Refused while a saved play uses it. */
-    async deleteCustomTag(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
-      const plays = playsUsingTag(latest.current.log, id);
-      if (plays > 0) return { ok: false, message: `Used in ${plays} saved ${plays === 1 ? 'play' : 'plays'} — can't delete.` };
-      try {
-        await db.deleteCustomTag(id);
-      } catch {
-        setError('Your tag was not deleted.');
-        return { ok: false, message: 'Could not delete this tag.' };
-      }
-      const d = latest.current;
-      const corrections = { ...d.corrections };
-      delete corrections[id];
-      setData({ ...d, customTags: d.customTags.filter((t) => t.id !== id), owned: d.owned.filter((o) => o !== id), corrections });
-      const url = photoUrls.current.get(id);
-      if (url) {
-        URL.revokeObjectURL(url);
-        photoUrls.current.delete(id);
-        if (alive.current) syncPhotos();
-      }
-      return { ok: true };
+    deleteCustomTag(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+      return enqueue(async () => {
+        const plays = playsUsingTag(latest.current.log, id);
+        if (plays > 0) return { ok: false as const, message: `Used in ${plays} saved ${plays === 1 ? 'play' : 'plays'} — can't delete.` };
+        try {
+          await db.deleteCustomTag(id);
+        } catch {
+          setError('Your tag was not deleted.');
+          return { ok: false as const, message: 'Could not delete this tag.' };
+        }
+        const d = latest.current;
+        const corrections = { ...d.corrections };
+        delete corrections[id];
+        setData({ ...d, customTags: d.customTags.filter((t) => t.id !== id), owned: d.owned.filter((o) => o !== id), corrections });
+        const url = photoUrls.current.get(id);
+        if (url) {
+          URL.revokeObjectURL(url);
+          photoUrls.current.delete(id);
+          if (alive.current) syncPhotos();
+        }
+        return { ok: true as const };
+      });
     },
     toggleOwned(tagId: string) {
       const nowOwned = !latest.current.owned.includes(tagId);
@@ -234,18 +247,20 @@ export function useAppData() {
         logRollback(id, undefined),
       );
     },
-    async restore(text: string): Promise<ParseResult> {
-      try {
-        const result = await restoreFromText(text);
-        if (result.ok) {
-          restoreGeneration.current++;
-          setData(result.data);
-          replacePhotoUrls(result.photos);
+    restore(text: string): Promise<ParseResult> {
+      return enqueue(async () => {
+        try {
+          const result = await restoreFromText(text);
+          if (result.ok) {
+            setData(result.data);
+            replacePhotoUrls(result.photos);
+            setPhotosLoadFailed(false);
+          }
+          return result;
+        } catch {
+          return { ok: false, error: 'Saving the restored data failed.' } as ParseResult;
         }
-        return result;
-      } catch {
-        return { ok: false, error: 'Saving the restored data failed.' };
-      }
+      });
     },
   };
 }
