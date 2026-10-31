@@ -341,8 +341,8 @@ describe('photos', () => {
     await user.click(await screen.findByRole('button', { name: 'set' }));
     await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[0]));
     await user.click(screen.getByRole('button', { name: 'restore' }));
-    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[created.length - 1]));
+    await waitFor(() => expect(created).toHaveLength(2));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[1]));
     expect(revoked).toContain(created[0]);
-    expect(created.length).toBe(2);
   });
 });

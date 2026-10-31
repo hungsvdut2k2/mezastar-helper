@@ -43,7 +43,14 @@ export function StatsScreen({ store }: { store: AppStore }) {
   const nameOf = (id: string | null) => store.tags.find((t) => t.id === id)?.name ?? 'nothing';
 
   async function backup() {
-    const json = JSON.stringify(makeBackup(store.data), null, 2);
+    let photos: Record<string, string>;
+    try {
+      photos = await store.exportPhotos();
+    } catch {
+      setMessage({ kind: 'error', text: 'Could not create the backup: the tag photos could not be read.' });
+      return;
+    }
+    const json = JSON.stringify(makeBackup(store.data, new Date(), photos), null, 2);
     const file = new File([json], `mezastar-backup-${localDate(new Date())}.json`, { type: 'application/json' });
     // On iPhone the share sheet has "Save to Files"; a plain download link is the fallback.
     if (navigator.canShare?.({ files: [file] })) {
@@ -191,6 +198,7 @@ export function StatsScreen({ store }: { store: AppStore }) {
 
       <h2>Backup</h2>
       <p className="hint">Save a backup to Files or iCloud Drive now and then. Data lives only on this phone.</p>
+      <p className="hint">Backups include your tag photos, so the file may be larger.</p>
       <div className="actions">
         <button type="button" className="primary" onClick={backup}>
           Save backup

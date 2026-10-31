@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as dbModule from '../../storage/db';
-import { loadAll, saveCorrection } from '../../storage/db';
+import { loadAll, putPhoto, saveCorrection } from '../../storage/db';
 import { freshDb } from '../../test/freshDb';
 import { WithStore } from '../testHarness';
 import { CollectionScreen } from './CollectionScreen';
@@ -119,4 +119,25 @@ it('keeps the tag editor open when saving fails', async () => {
   expect(screen.getByRole('heading', { level: 1, name: /Lugia/ })).toBeInTheDocument();
   expect(screen.getByLabelText('Attack')).toHaveValue(150);
   vi.restoreAllMocks();
+});
+
+it('shows a thumbnail in the list for tags with a photo, and offers Add photo in the editor', async () => {
+  const user = userEvent.setup();
+  await putPhoto('1-3-001', new Blob(['x'], { type: 'image/jpeg' }));
+  renderScreen();
+  expect(await screen.findByRole('img', { name: 'Photo of Lugia' })).toBeInTheDocument();
+  expect(screen.getAllByRole('img')).toHaveLength(1);
+  await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
+  expect(screen.getByLabelText('Change photo')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
+});
+
+it('removes a photo from the editor', async () => {
+  const user = userEvent.setup();
+  await putPhoto('1-3-001', new Blob(['x'], { type: 'image/jpeg' }));
+  renderScreen();
+  await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+  expect(await screen.findByLabelText('Add photo')).toBeInTheDocument();
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
 });

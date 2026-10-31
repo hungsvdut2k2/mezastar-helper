@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeBackup } from '../../storage/backup';
+import * as dbModule from '../../storage/db';
 import { addLogEntry, loadAll, setOwned } from '../../storage/db';
 import { localDate } from '../format';
 import { makeLogEntry } from '../../test/factories';
@@ -164,6 +165,19 @@ describe('backup', () => {
     const file = share.mock.calls[0][0].files![0];
     expect(file.name).toBe(`mezastar-backup-${localDate(new Date())}.json`);
     expect(file.type).toBe('application/json');
+  });
+
+  it('puts tag photos into the backup file and mentions it', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['hello'], { type: 'image/png' }) });
+    const share = vi.fn(async (_d: ShareData) => {});
+    stubNavigator(share);
+    const user = userEvent.setup();
+    renderScreen();
+    expect(await screen.findByText(/Backups include your tag photos/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save backup' }));
+    await screen.findByRole('status');
+    const text = await share.mock.calls[0][0].files![0].text();
+    expect(JSON.parse(text).photos).toEqual({ '1-3-001': `data:image/png;base64,${btoa('hello')}` });
   });
 
   it('treats closing the share sheet as a cancel, not an error', async () => {

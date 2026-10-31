@@ -85,3 +85,6 @@ summary { cursor: pointer; min-height: 44px; display: flex; align-items: center;
 .tabbar button[aria-current='page'] { color: var(--navy); font-weight: 700; box-shadow: inset 0 3px 0 var(--navy); }
 .picker-status { margin: 4px 0 0; }
 .picker-status:empty { margin: 0; }
+.photo-editor { margin: 8px 0; }
+.tag-photo { display: block; max-width: 100%; height: auto; border-radius: 10px; margin: 8px 0; }
+.tag-thumb { flex: none; width: 44px; height: 44px; object-fit: cover; border-radius: 8px; }

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection, type TagStats } from '../../data/types';
 import { gradeLabel, typeLabel } from '../format';
+import { PhotoError, processPhoto, type Rasterizer } from '../photo';
 
 type Props = {
   /** The tag as the player currently sees it (shipped data plus any earlier correction). */
@@ -12,6 +13,13 @@ type Props = {
   onSave: (correction: TagCorrection | null) => void | Promise<void>;
   onReset: () => void | Promise<void>;
   onClose: () => void;
+  /** Object URL of the player's photo of this tag, if any. */
+  photoUrl?: string;
+  /** Receives the already-downscaled photo; resolves to true when stored. */
+  onSetPhoto?: (blob: Blob) => Promise<boolean>;
+  onRemovePhoto?: () => Promise<boolean>;
+  /** Replaces the canvas-based image decoder (tests). */
+  rasterizer?: Rasterizer;
 };
 
 const FIELDS = [
@@ -25,7 +33,7 @@ type Field = (typeof FIELDS)[number][0];
 
 const toText = (v: number | null) => (v === null ? '' : String(v));
 
-export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose }: Props) {
+export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose, photoUrl, onSetPhoto, onRemovePhoto, rasterizer }: Props) {
   const [grade, setGrade] = useState(tag.grade === null ? '' : String(tag.grade));
   const [type1, setType1] = useState<PokemonType>(tag.types[0] ?? POKEMON_TYPES[0]);
   const [type2, setType2] = useState<string>(tag.types[1] ?? '');
@@ -40,9 +48,38 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
   const [moveType, setMoveType] = useState<PokemonType>(tag.move?.type ?? tag.types[0] ?? POKEMON_TYPES[0]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => heading.current?.focus(), []);
+
+  async function pickPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !onSetPhoto) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const blob = await processPhoto(file, rasterizer);
+      if (!(await onSetPhoto(blob))) setPhotoError('Could not save the photo.');
+    } catch (err) {
+      setPhotoError(err instanceof PhotoError ? err.message : 'Could not save the photo.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    if (!onRemovePhoto) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      if (!(await onRemovePhoto())) setPhotoError('Could not remove the photo.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   async function save() {
     const parsed = {} as Record<Field, number | null>;
@@ -99,6 +136,27 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
         {gradeLabel(tag.grade)}
         {tag.gimmick && ` · ${GIMMICK_NAME[tag.gimmick.kind]}${tag.gimmick.moveName ? `: ${tag.gimmick.moveName}` : ''}`}
       </p>
+      {onSetPhoto && (
+        <div className="photo-editor">
+          {photoUrl && <img className="tag-photo" src={photoUrl} alt={`Photo of ${tag.name}`} width={96} />}
+          <div className="actions">
+            <label className="file-button">
+              {photoUrl ? 'Change photo' : 'Add photo'}
+              <input type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} />
+            </label>
+            {photoUrl && onRemovePhoto && (
+              <button type="button" disabled={photoBusy} onClick={removePhoto}>
+                Remove photo
+              </button>
+            )}
+          </div>
+          {photoError && (
+            <p className="error" role="alert">
+              {photoError}
+            </p>
+          )}
+        </div>
+      )}
       <p className="hint">Copy the numbers from the back of your tag. Leave a box empty if you don't know it.</p>
 
       <label>
