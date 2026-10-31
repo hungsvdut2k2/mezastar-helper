@@ -41,12 +41,10 @@ export function CollectionScreen({ store }: { store: AppStore }) {
         shipped={shipped}
         hasCorrection={editing.id in store.data.corrections}
         onSave={async (c) => {
-          await store.saveCorrection(editing.id, c);
-          close();
+          if (await store.saveCorrection(editing.id, c)) close();
         }}
         onReset={async () => {
-          await store.saveCorrection(editing.id, null);
-          close();
+          if (await store.saveCorrection(editing.id, null)) close();
         }}
         onClose={close}
       />

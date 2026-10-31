@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as dbModule from '../../storage/db';
 import { loadAll, saveCorrection } from '../../storage/db';
 import { freshDb } from '../../test/freshDb';
 import { WithStore } from '../testHarness';
@@ -104,4 +105,18 @@ it('moves focus to the editor heading, then back to the tag row', async () => {
 it('groups the filter buttons', async () => {
   renderScreen();
   expect(await screen.findByRole('group', { name: 'Show tags' })).toBeInTheDocument();
+});
+
+it('keeps the tag editor open when saving fails', async () => {
+  const user = userEvent.setup();
+  const spy = vi.spyOn(dbModule, 'saveCorrection').mockRejectedValueOnce(new Error('disk full'));
+  renderScreen();
+  await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.type(screen.getByLabelText('Attack'), '150');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+  expect(screen.getByRole('heading', { level: 1, name: /Lugia/ })).toBeInTheDocument();
+  expect(screen.getByLabelText('Attack')).toHaveValue(150);
+  vi.restoreAllMocks();
 });
