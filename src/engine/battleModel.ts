@@ -1,6 +1,9 @@
 import type { Gimmick, PokemonType, Tag } from '../data/types';
 import { effectiveness } from './typeEffectiveness';
 
+/** True for the stand-in crony the Plan screen uses when the player did not enter one (see unknownOpponent). */
+export const isUnknownOpponent = (t: Tag) => t.id.startsWith('unknown-');
+
 /** Placeholder constants. Measure with the play log before changing them. */
 export const MODEL = {
   neutralStat: 100, // stands in for any unknown HP / Attack / Defense / Speed

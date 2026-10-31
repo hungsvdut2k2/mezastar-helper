@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import { recommend, type Recommendation } from '../../engine/recommend';
+import { UNKNOWN_STATS_NOTE } from '../../engine/teamScoring';
 import { TRUST_LABEL } from '../format';
 
 type Props = { owned: Tag[]; battle: Battle; onUseTeam?: (rec: Recommendation) => void };
@@ -35,7 +36,8 @@ function TeamCard({ rank, rec, onUse }: { rank: number; rec: Recommendation; onU
   return (
     <article className="card">
       <h3>{`Team ${rank}: ${rec.team.map((t) => t.name).join(' + ')}`}</h3>
-      <p className="reason">{rec.reason}</p>
+      {/* With a plan, the plan block explains unknown stats once; don't repeat it in the reason line. */}
+      <p className="reason">{rec.plan ? rec.reason.replace(UNKNOWN_STATS_NOTE, '') : rec.reason}</p>
       {rec.plan ? (
         <>
           <h4>
@@ -53,12 +55,12 @@ function TeamCard({ rank, rec, onUse }: { rank: number; rec: Recommendation; onU
             ))}
           </ol>
           <p className="comparison">{rec.plan.comparison}</p>
-          {rec.plan.usesUnknownStats && (
+          {rec.plan.kind === 'searched' && rec.plan.usesUnknownStats && (
             <p className="hint">Some stats are unknown, so these numbers are rough estimates.</p>
           )}
         </>
       ) : (
-        <p>Own at least 2 tags to get a battle plan.</p>
+        <p>{rec.team.length >= 2 ? 'No plan found for this team.' : 'Own at least 2 tags to get a battle plan.'}</p>
       )}
       {onUse && (
         <button type="button" className="primary" onClick={onUse}>

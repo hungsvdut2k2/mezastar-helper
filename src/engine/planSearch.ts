@@ -1,5 +1,6 @@
 import { GIMMICK_NAME, type Tag, type Trust } from '../data/types';
 import {
+  isUnknownOpponent,
   attackType,
   damage,
   MODEL,
@@ -264,8 +265,9 @@ export function bestPlan(team: Tag[], battle: Battle): PlanResult | null {
       kind: 'ruleOfThumb',
       steps: defaultTurns.map((turn, i) => ruleStep(team, battle, turn, i)),
       score: null,
-      comparison:
-        'Some HP, Attack or Speed values are unknown, so this is the usual rule of thumb. Add them in Collection for a searched plan.',
+      comparison: battle.opponents.some(isUnknownOpponent)
+        ? 'Some HP, Attack or Speed values are unknown, so this is the usual rule of thumb. Enter the real opponents at the machine for a searched plan.'
+        : 'Some HP, Attack or Speed values are unknown, so this is the usual rule of thumb. Add them in Collection for a searched plan.',
       usesUnknownStats: true,
     };
   }
@@ -277,9 +279,8 @@ export function bestPlan(team: Tag[], battle: Battle): PlanResult | null {
     kind: 'searched',
     steps: found.result.outcomes.map((o, i) => searchedStep(team, battle, o, i)),
     score: found.result.score,
-    comparison: usesUnknownStats
-      ? `${comparison} Some Attack, Defense or Speed values are unknown and counted as average, so the numbers are rough.`
-      : comparison,
+    // The screen shows one "rough estimates" hint per plan, so the sentence is not repeated here.
+    comparison,
     usesUnknownStats,
   };
 }

@@ -40,6 +40,9 @@ function bestAgainst(team: Tag[], opp: Tag): Tag {
   return best;
 }
 
+/** Closing sentence of a team's reason when some stats are unknown. */
+export const UNKNOWN_STATS_NOTE = ' Some stats unknown, counted as average.';
+
 const hasUnknownStats = (t: Tag) => Object.values(t.stats).some((v) => v === null);
 
 function reasonFor(team: Tag[], battle: Battle, unknown: boolean): string {
@@ -49,7 +52,7 @@ function reasonFor(team: Tag[], battle: Battle, unknown: boolean): string {
     const word = effectText(effectiveness(attackType(best, false), opp.types));
     return `${best.name} → ${opp.name} (${role}): ${word}`;
   });
-  return parts.join('; ') + (unknown ? '. Some stats unknown, counted as average.' : '.');
+  return parts.join('; ') + (unknown ? `.${UNKNOWN_STATS_NOTE}` : '.');
 }
 
 export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
