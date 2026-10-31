@@ -3,6 +3,12 @@ import { POKEMON_TYPES } from '../data/types';
 import { effectiveness, effectText } from './typeEffectiveness';
 
 describe('type chart', () => {
+  it('matches the standard chart entry counts (51 × 2, 61 × 0.5, 8 × 0)', () => {
+    const all = Object.values(TYPE_CHART).flatMap((row) => Object.values(row));
+    expect(all.filter((m) => m === 2)).toHaveLength(51);
+    expect(all.filter((m) => m === 0.5)).toHaveLength(61);
+    expect(all.filter((m) => m === 0)).toHaveLength(8);
+  });
   it('has a row for all 18 types with only 0, 0.5 or 2 entries', () => {
     expect(Object.keys(TYPE_CHART).sort()).toEqual([...POKEMON_TYPES].sort());
     for (const row of Object.values(TYPE_CHART)) {
