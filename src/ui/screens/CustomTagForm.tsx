@@ -23,6 +23,7 @@ type Props = {
 };
 
 type Field = 'code' | 'name' | 'type1' | 'moveName';
+const ERROR_ID = 'custom-tag-error';
 
 /** Official tags printed with this code (the same code can appear in several sets). */
 export function officialTagsWithCode(code: string): Tag[] {
@@ -43,6 +44,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
   const [legendary, setLegendary] = useState(tag?.legendary ?? false);
   const [mythical, setMythical] = useState(tag?.mythical ?? false);
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<Field | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -57,10 +59,40 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
 
   useEffect(() => heading.current?.focus(), []);
 
+  // Where focus goes after the delete confirmation opens or closes. Set by the player's own action, so nothing moves on first render.
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const focusNext = useRef<'confirm' | 'delete' | null>(null);
+  useEffect(() => {
+    if (focusNext.current === 'confirm') confirmButton.current?.focus();
+    if (focusNext.current === 'delete') deleteButton.current?.focus();
+    focusNext.current = null;
+  }, [confirmingDelete]);
+  const openConfirm = () => {
+    setDeleteError(null);
+    focusNext.current = 'confirm';
+    setConfirmingDelete(true);
+  };
+  const closeConfirm = () => {
+    focusNext.current = 'delete';
+    setConfirmingDelete(false);
+  };
+
+  /** Props that tie a field to the error message when that field is the one in error. */
+  const invalid = (field: Field) => (errorField === field ? { 'aria-invalid': true, 'aria-describedby': ERROR_ID } : {});
+  /** Editing the field in error clears the message. */
+  const clearErrorFor = (field: Field) => {
+    if (errorField === field) {
+      setError(null);
+      setErrorField(null);
+    }
+  };
+
   const duplicates = officialTagsWithCode(code);
 
   function fail(field: Field, message: string) {
     setError(message);
+    setErrorField(field);
     refs[field].current?.focus();
   }
 
@@ -75,6 +107,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
     if (!type1) return fail('type1', 'Choose at least one type.');
     if (trimmedMove.length > MAX_MOVE_LENGTH) return fail('moveName', `The move name can be at most ${MAX_MOVE_LENGTH} characters.`);
     setError(null);
+    setErrorField(null);
     const types = type2 && type2 !== type1 ? [type1 as PokemonType, type2 as PokemonType] : [type1 as PokemonType];
     const saved = makeCustomTag(id.current, {
       printedCode: trimmedCode,
@@ -101,7 +134,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
       const result = await onDelete();
       if (!result.ok) {
         setDeleteError(result.message);
-        setConfirmingDelete(false);
+        closeConfirm();
       }
     } finally {
       setSaving(false);
@@ -129,7 +162,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
 
       <label>
         Printed code
-        <input ref={refs.code as React.RefObject<HTMLInputElement>} value={code} required maxLength={MAX_CODE_LENGTH} onChange={(e) => setCode(e.target.value)} placeholder="as on the back of the tag" />
+        <input ref={refs.code as React.RefObject<HTMLInputElement>} value={code} required maxLength={MAX_CODE_LENGTH} {...invalid('code')} onChange={(e) => { setCode(e.target.value); clearErrorFor('code'); }} placeholder="as on the back of the tag" />
       </label>
       <div role="status">
         {duplicates.length > 0 && (
@@ -143,7 +176,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
       </div>
       <label>
         Name
-        <input ref={refs.name as React.RefObject<HTMLInputElement>} value={name} required maxLength={MAX_NAME_LENGTH} onChange={(e) => setName(e.target.value)} />
+        <input ref={refs.name as React.RefObject<HTMLInputElement>} value={name} required maxLength={MAX_NAME_LENGTH} {...invalid('name')} onChange={(e) => { setName(e.target.value); clearErrorFor('name'); }} />
       </label>
       <label>
         Grade
@@ -158,7 +191,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
       </label>
       <label>
         Type
-        <select ref={refs.type1 as React.RefObject<HTMLSelectElement>} value={type1} required onChange={(e) => setType1(e.target.value)}>
+        <select ref={refs.type1 as React.RefObject<HTMLSelectElement>} value={type1} required {...invalid('type1')} onChange={(e) => { setType1(e.target.value); clearErrorFor('type1'); }}>
           <option value="">choose a type</option>
           {typeOptions}
         </select>
@@ -172,14 +205,16 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
       </label>
       <label>
         Move
-        <input ref={refs.moveName as React.RefObject<HTMLInputElement>} value={moveName} onChange={(e) => setMoveName(e.target.value)} placeholder="optional" />
+        <input ref={refs.moveName as React.RefObject<HTMLInputElement>} value={moveName} {...invalid('moveName')} onChange={(e) => { setMoveName(e.target.value); clearErrorFor('moveName'); }} placeholder="optional" />
       </label>
-      <label>
-        Move type
-        <select value={moveType} onChange={(e) => setMoveType(e.target.value as PokemonType)}>
-          {typeOptions}
-        </select>
-      </label>
+      {moveName.trim() && (
+        <label>
+          Move type
+          <select value={moveType} onChange={(e) => setMoveType(e.target.value as PokemonType)}>
+            {typeOptions}
+          </select>
+        </label>
+      )}
       <label>
         Special move
         <select value={gimmick} onChange={(e) => setGimmick(e.target.value)}>
@@ -201,7 +236,11 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
       </label>
 
       <div role="alert">
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <p id={ERROR_ID} className="error">
+            {error}
+          </p>
+        )}
         {deleteError && <p className="error">{deleteError}</p>}
       </div>
       <div className="actions">
@@ -209,7 +248,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
           {tag ? 'Save changes' : 'Save tag'}
         </button>
         {tag && onDelete && !confirmingDelete && (
-          <button type="button" disabled={saving} onClick={() => { setDeleteError(null); setConfirmingDelete(true); }}>
+          <button ref={deleteButton} type="button" disabled={saving} onClick={openConfirm}>
             Delete tag
           </button>
         )}
@@ -218,10 +257,10 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
         <div className="notice" role="group" aria-label="Confirm delete">
           <p>{`Delete ${tag?.name}? Its owned mark and photo are removed too.`}</p>
           <div className="actions">
-            <button type="button" className="primary" disabled={saving} onClick={remove}>
+            <button ref={confirmButton} type="button" className="primary" disabled={saving} onClick={remove}>
               Yes, delete
             </button>
-            <button type="button" disabled={saving} onClick={() => setConfirmingDelete(false)}>
+            <button type="button" disabled={saving} onClick={closeConfirm}>
               Keep it
             </button>
           </div>

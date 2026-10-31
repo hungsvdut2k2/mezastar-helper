@@ -380,6 +380,56 @@ describe('adding your own tag', () => {
     expect(await dbModule.getAllPhotos()).toEqual({});
   });
 
+  it('focuses "Yes, delete" when the confirmation opens and "Delete tag" when it closes', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await addAndOpenEdit(user);
+    await user.click(screen.getByRole('button', { name: 'Delete tag' }));
+    expect(screen.getByRole('button', { name: 'Yes, delete' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(screen.getByRole('button', { name: 'Delete tag' })).toHaveFocus();
+  });
+
+  it('puts focus back on "Delete tag" when the delete is refused', async () => {
+    const user = userEvent.setup();
+    await putCustomTag(makeTag('my-fixed', { name: 'Homebrew', printedCode: 'X-1' }));
+    await addLogEntry(makeLogEntry({ id: 'p1', teamUsed: ['my-fixed'] }));
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'my-tags');
+    await user.click(screen.getByRole('button', { name: /^Homebrew X-1/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete tag' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("can't delete");
+    expect(screen.getByRole('button', { name: 'Delete tag' })).toHaveFocus();
+  });
+
+  it('marks the field in error and ties it to the message, clearing both once it is edited', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    const code = screen.getByLabelText('Printed code');
+    expect(code).toHaveAttribute('aria-invalid', 'true');
+    const message = screen.getByText('Enter the printed code from the back of the tag.');
+    expect(code).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.getByLabelText('Name')).not.toHaveAttribute('aria-invalid');
+    await user.type(code, 'X');
+    expect(code).not.toHaveAttribute('aria-invalid');
+    expect(code).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Enter the printed code from the back of the tag.')).not.toBeInTheDocument();
+  });
+
+  it('shows the Move type select only once a move name is entered', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    expect(screen.queryByLabelText('Move type')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Move'), 'Zap');
+    expect(screen.getByLabelText('Move type')).toBeInTheDocument();
+    await user.clear(screen.getByLabelText('Move'));
+    expect(screen.queryByLabelText('Move type')).not.toBeInTheDocument();
+  });
+
   it('blocks delete while a saved play uses the tag', async () => {
     const user = userEvent.setup();
     await putCustomTag(makeTag('my-fixed', { name: 'Homebrew', printedCode: 'X-1' }));
