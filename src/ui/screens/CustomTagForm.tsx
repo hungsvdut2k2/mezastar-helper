@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   makeCustomTag, newCustomId, MAX_CODE_LENGTH, MAX_MOVE_LENGTH, MAX_NAME_LENGTH,
 } from '../../data/customTag';
-import { printedCode, setOfTag } from '../../data/setInfo';
+import { printedCode, setLabel } from '../../data/setInfo';
 import { TAGS } from '../../data/tags';
 import { GIMMICKS, GIMMICK_NAME, POKEMON_TYPES, type Gimmick, type Grade, type PokemonType, type Tag } from '../../data/types';
 import { typeLabel } from '../format';
@@ -135,7 +135,7 @@ export function CustomTagForm({ tag, onSave, onDelete, onClose, photoUrl, onSetP
         {duplicates.length > 0 && (
           <p className="notice">
             {duplicates
-              .map((t) => `This code is already in ${setOfTag(t)?.name}: ${t.name}`)
+              .map((t) => `This code is already in ${setLabel(t)}: ${t.name}`)
               .join('. ')}{' '}
             — mark that one owned instead? You can still save this one.
           </p>

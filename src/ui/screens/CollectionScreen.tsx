@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MY_TAGS, MY_TAGS_ID, SETS, isCustomId, printedCode, setOfTag, type AnySetId } from '../../data/setInfo';
+import { MY_TAGS, MY_TAGS_ID, SETS, isCustomId, isInSet, printedCode, setLabel, type AnySetId } from '../../data/setInfo';
 import { TAGS } from '../../data/tags';
 import type { Tag } from '../../data/types';
 import { gradeLabel, searchTags, typeLabel } from '../format';
@@ -113,7 +113,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
     );
   }
 
-  const inSet = (t: Tag) => setChoice === 'all' || setOfTag(t)?.id === setChoice;
+  const inSet = (t: Tag) => setChoice === 'all' || isInSet(t, setChoice);
   const inScope = store.tags.filter(inSet);
   const ownedInScope = inScope.filter((t) => owned.has(t.id)).length;
   const isShown = (t: Tag) => filter === 'all' || (filter === 'owned') === owned.has(t.id);
@@ -122,7 +122,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
     const seen = new Map<string, number>();
     const labels = new Map<string, string>();
     for (const t of store.tags) {
-      const key = `${t.name}\u0000${printedCode(t)}\u0000${setOfTag(t)?.id}`;
+      const key = `${t.name}\u0000${printedCode(t)}\u0000${setLabel(t)}`;
       const n = (seen.get(key) ?? 0) + 1;
       seen.set(key, n);
       labels.set(t.id, n > 1 ? `${t.name} (${n})` : t.name);
@@ -177,7 +177,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               <button
                 type="button"
                 className={isOwned ? 'own on' : 'own'}
-                aria-label={`Owned: ${labelOf(t)} ${printedCode(t)}, ${setOfTag(t)?.name}`}
+                aria-label={`Owned: ${labelOf(t)} ${printedCode(t)}, ${setLabel(t)}`}
                 aria-pressed={isOwned}
                 onClick={() => store.toggleOwned(t.id)}
               >
@@ -185,7 +185,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               </button>
               {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt="" width={44} height={44} />}
               <button type="button" className="tag-row" data-row-id={t.id} onClick={() => setEditingId(t.id)}>
-                <strong>{labelOf(t)}</strong> <small>{`${printedCode(t)} · ${setOfTag(t)?.name} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
+                <strong>{labelOf(t)}</strong> <small>{`${printedCode(t)} · ${setLabel(t)} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
               </button>
             </li>
           );

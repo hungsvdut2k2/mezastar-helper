@@ -3,7 +3,7 @@ import { setById } from '../setInfo';
 import { makeTagBuilder } from './builder';
 
 // Source: docs/research/other-sets.md (Galaxy Version 3). Grade 2-4 tags have grade null (the page gives only the group).
-// Regular Tags use namespaced ids with the printed code in printedCode (see setInfo.ts).
+// Regular Tags are one id per printed tag per series (R-1-n / R-2-n), defined once; see setInfo.ts.
 const tag = makeTagBuilder(setById('galaxy-v3').url);
 
 export const GALAXY_V3: Tag[] = [
@@ -77,7 +77,4 @@ export const GALAXY_V3: Tag[] = [
   tag('2-3-068', 'Klang', null, ['steel']),
   tag('2-3-069', 'Klinklang', null, ['steel']),
   tag('2-3-070', 'Absol', null, ['dark']),
-  tag('2-3-R-1', 'Pikachu', null, ['electric'], { printedCode: 'R-2-1', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
-  tag('2-3-R-2', 'Charizard', null, ['fire', 'flying'], { printedCode: 'R-2-2', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
-  tag('2-3-R-3', 'Gengar', null, ['ghost', 'poison'], { printedCode: 'R-2-3', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
 ];

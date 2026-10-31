@@ -3,7 +3,7 @@ import { setById } from '../setInfo';
 import { makeTagBuilder } from './builder';
 
 // Source: docs/research/other-sets.md (Stardust Version 4). Grade 2-4 tags have grade null (the page gives only the group).
-// Regular Tags use namespaced ids with the printed code in printedCode (see setInfo.ts).
+// Regular Tags are one id per printed tag per series (R-1-n / R-2-n), defined once; see setInfo.ts.
 const tag = makeTagBuilder(setById('stardust-v4').url);
 
 export const STARDUST_V4: Tag[] = [
@@ -77,7 +77,4 @@ export const STARDUST_V4: Tag[] = [
   tag('1-4-068', 'Talonflame', null, ['fire', 'flying']),
   tag('1-4-069', 'Noibat', null, ['flying', 'dragon']),
   tag('1-4-070', 'Noivern', null, ['flying', 'dragon']),
-  tag('1-4-R-1', 'Pikachu', null, ['electric'], { printedCode: 'R-1-1', gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
-  tag('1-4-R-2', 'Lucario', null, ['fighting', 'steel'], { printedCode: 'R-1-2', gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
-  tag('1-4-R-3', 'Snorlax', null, ['normal'], { printedCode: 'R-1-3', gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
 ];

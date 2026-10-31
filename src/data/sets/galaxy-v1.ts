@@ -3,7 +3,8 @@ import { setById } from '../setInfo';
 import { makeTagBuilder } from './builder';
 
 // Source: docs/research/other-sets.md (Galaxy Version 1). Grade 2-4 tags have grade null (the page gives only the group).
-// Regular Tags use namespaced ids with the printed code in printedCode (see setInfo.ts).
+// Regular Tags are one id per printed tag per series (R-1-n / R-2-n), defined once; see setInfo.ts.
+const ALSO_ON = [setById('galaxy-v2').url, setById('galaxy-v3').url];
 const tag = makeTagBuilder(setById('galaxy-v1').url);
 
 export const GALAXY_V1: Tag[] = [
@@ -27,8 +28,8 @@ export const GALAXY_V1: Tag[] = [
   tag('2-1-018', 'Arctovish', 5, ['water', 'ice']),
   tag('2-1-019', 'Electivire', 5, ['electric'], { gimmick: { kind: 'chainAttack', moveName: 'Wild Charge', moveType: 'electric' } }),
   tag('2-1-020', 'Magmortar', 5, ['fire'], { gimmick: { kind: 'chainAttack', moveName: 'Flamethrower', moveType: 'fire' } }),
-  tag('2-1-021', 'Toxtricity', 5, ['electric', 'poison'], { move: { name: 'Overdrive', type: 'electric' }, gimmick: { kind: 'chainAttack', moveName: 'Overdrive', moveType: 'electric' } }),
-  tag('2-1-022', 'Toxtricity', 5, ['electric', 'poison'], { move: { name: 'Sludge Wave', type: 'poison' }, gimmick: { kind: 'chainAttack', moveName: 'Sludge Wave', moveType: 'poison' } }),
+  tag('2-1-021', 'Toxtricity (Amped)', 5, ['electric', 'poison'], { move: { name: 'Overdrive', type: 'electric' }, gimmick: { kind: 'chainAttack', moveName: 'Overdrive', moveType: 'electric' } }),
+  tag('2-1-022', 'Toxtricity (Low Key)', 5, ['electric', 'poison'], { move: { name: 'Sludge Wave', type: 'poison' }, gimmick: { kind: 'chainAttack', moveName: 'Sludge Wave', moveType: 'poison' } }),
   tag('2-1-023', 'Great Tusk', 5, ['ground', 'fighting']),
   tag('2-1-024', 'Vikavolt', 5, ['bug', 'electric']),
   tag('2-1-025', 'Abomasnow', 5, ['grass', 'ice']),
@@ -77,7 +78,7 @@ export const GALAXY_V1: Tag[] = [
   tag('2-1-068', 'Nidoran♂', null, ['poison']),
   tag('2-1-069', 'Nidorino', null, ['poison']),
   tag('2-1-070', 'Nidoking', null, ['poison', 'ground']),
-  tag('2-1-R-1', 'Pikachu', null, ['electric'], { printedCode: 'R-2-1', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
-  tag('2-1-R-2', 'Charizard', null, ['fire', 'flying'], { printedCode: 'R-2-2', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
-  tag('2-1-R-3', 'Gengar', null, ['ghost', 'poison'], { printedCode: 'R-2-3', gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
+  tag('R-2-1', 'Pikachu', null, ['electric'], { alsoOn: ALSO_ON, gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
+  tag('R-2-2', 'Charizard', null, ['fire', 'flying'], { alsoOn: ALSO_ON, gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
+  tag('R-2-3', 'Gengar', null, ['ghost', 'poison'], { alsoOn: ALSO_ON, gimmick: { kind: 'gigantamax', moveName: null, moveType: null } }),
 ];

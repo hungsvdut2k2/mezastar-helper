@@ -84,26 +84,45 @@ describe('set filter', () => {
     expect(screen.queryByRole('button', { name: /^Lugia/ })).not.toBeInTheDocument();
   });
 
-  it('tells apart Regular Tags that share a printed code across sets', async () => {
+  it('shows a Regular Tag once under all sets, and in each set of its series', async () => {
     const user = userEvent.setup();
     renderScreen();
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'all');
+    const set = await screen.findByRole('combobox', { name: 'Set' });
+    await user.selectOptions(set, 'all');
     await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'R-2-1');
-    const toggles = screen.getAllByRole('button', { name: /^Owned: .* R-2-1, / });
-    const names = toggles.map((b) => b.getAttribute('aria-label'));
-    expect(names.length).toBeGreaterThan(1);
-    expect(new Set(names).size).toBe(names.length);
+    expect(screen.getAllByRole('button', { name: /^Owned: .* R-2-1, Galaxy \(Regular\)$/ })).toHaveLength(1);
+    for (const id of ['galaxy-v1', 'galaxy-v2', 'galaxy-v3']) {
+      await user.selectOptions(set, id);
+      expect(screen.getAllByRole('button', { name: /^Owned: .* R-2-1, / })).toHaveLength(1);
+    }
+    await user.selectOptions(set, 'stardust-v3');
+    expect(screen.queryByRole('button', { name: /^Owned: .* R-2-1, / })).not.toBeInTheDocument();
   });
 
-  it('shows the printed code and set name on each row and in the editor', async () => {
+  it('counts an owned Regular Tag in every set of its series', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const set = await screen.findByRole('combobox', { name: 'Set' });
+    await user.selectOptions(set, 'galaxy-v1');
+    await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'R-2-1');
+    await user.click(screen.getByRole('button', { name: /^Owned: .* R-2-1, / }));
+    await user.clear(screen.getByRole('searchbox', { name: 'Search tags' }));
+    expect(await screen.findByText('Owned 1 / 73')).toBeInTheDocument();
+    await user.selectOptions(set, 'galaxy-v3');
+    expect(screen.getByText('Owned 1 / 73')).toBeInTheDocument();
+    await user.selectOptions(set, 'stardust-v1');
+    expect(screen.getByText('Owned 0 / 70')).toBeInTheDocument();
+  });
+
+  it('shows the printed code and series label on each row and in the editor', async () => {
     const user = userEvent.setup();
     renderScreen();
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'galaxy-v2');
     await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'R-2-1');
-    const row = screen.getByRole('button', { name: /^.* R-2-1 · Galaxy V2/ });
+    const row = screen.getByRole('button', { name: /^.* R-2-1 · Galaxy \(Regular\)/ });
     await user.click(row);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('R-2-1');
-    expect(screen.getByText(/^Galaxy V2 ·/)).toBeInTheDocument();
+    expect(screen.getByText(/^Galaxy \(Regular\) ·/)).toBeInTheDocument();
   });
 });
 

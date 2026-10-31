@@ -2,6 +2,7 @@ import type { Tag } from '../types';
 import { setById } from '../setInfo';
 import { makeTagBuilder, L, M } from './builder';
 
+const ALSO_ON = [setById('stardust-v2').url, setById('stardust-v4').url];
 const tag = makeTagBuilder(setById('stardust-v3').url);
 
 export const STARDUST_V3: Tag[] = [
@@ -85,7 +86,7 @@ export const STARDUST_V3: Tag[] = [
   tag('1-3-070', 'Haxorus', null, ['dragon']),
 
   // Regular Tags (all can Dynamax; Max Move names are not on the page)
-  tag('R-1-1', 'Pikachu', null, ['electric'], { gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
-  tag('R-1-2', 'Lucario', null, ['fighting', 'steel'], { gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
-  tag('R-1-3', 'Snorlax', null, ['normal'], { gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
+  tag('R-1-1', 'Pikachu', null, ['electric'], { alsoOn: ALSO_ON, gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
+  tag('R-1-2', 'Lucario', null, ['fighting', 'steel'], { alsoOn: ALSO_ON, gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
+  tag('R-1-3', 'Snorlax', null, ['normal'], { alsoOn: ALSO_ON, gimmick: { kind: 'dynamax', moveName: null, moveType: null } }),
 ];

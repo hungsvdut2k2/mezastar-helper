@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Tag } from '../../data/types';
-import { printedCode, setOfTag } from '../../data/setInfo';
+import { printedCode, setLabel } from '../../data/setInfo';
 import { gradeLabel, searchTags } from '../format';
 
 type Props = { label: string; tags: Tag[]; value: Tag | null; onChange: (tag: Tag | null) => void };
 
 /** Code, grade and set, so the same Pokémon in different sets can be told apart. */
-const tagLabel = (t: Tag) => [printedCode(t), gradeLabel(t.grade), setOfTag(t)?.name].filter(Boolean).join(' ');
+const tagLabel = (t: Tag) => [printedCode(t), gradeLabel(t.grade), setLabel(t)].filter(Boolean).join(' ');
 
 export function TagPicker({ label, tags, value, onChange }: Props) {
   const [query, setQuery] = useState('');

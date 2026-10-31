@@ -3,7 +3,7 @@ import { setById } from '../setInfo';
 import { makeTagBuilder } from './builder';
 
 // Source: docs/research/other-sets.md (Stardust Version 1). Grade 2-4 tags have grade null (the page gives only the group).
-// Regular Tags use namespaced ids with the printed code in printedCode (see setInfo.ts).
+// Regular Tags are one id per printed tag per series (R-1-n / R-2-n), defined once; see setInfo.ts.
 const tag = makeTagBuilder(setById('stardust-v1').url);
 
 export const STARDUST_V1: Tag[] = [
@@ -15,7 +15,7 @@ export const STARDUST_V1: Tag[] = [
   tag('1-1-006', 'Metagross', 6, ['steel', 'psychic']),
   tag('1-1-007', 'Miraidon', 6, ['electric', 'dragon'], { legendary: true, move: { name: 'Electro Drift', type: 'electric' } }),
   tag('1-1-008', 'Venusaur', 6, ['grass', 'poison'], { gimmick: { kind: 'mega', moveName: 'Leaf Storm', moveType: 'grass' } }),
-  tag('1-1-009', 'Charizard', 6, ['fire', 'dragon'], { gimmick: { kind: 'mega', moveName: 'Flamethrower', moveType: 'fire' } }),
+  tag('1-1-009', 'Charizard', 6, ['fire', 'flying'], { gimmick: { kind: 'mega', moveName: 'Flamethrower', moveType: 'fire' } }),
   tag('1-1-010', 'Blastoise', 6, ['water'], { gimmick: { kind: 'mega', moveName: 'Hydro Pump', moveType: 'water' } }),
   tag('1-1-011', 'Vaporeon', 5, ['water']),
   tag('1-1-012', 'Flareon', 5, ['fire']),

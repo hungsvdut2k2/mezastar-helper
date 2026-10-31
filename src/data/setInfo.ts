@@ -45,24 +45,40 @@ export function setById(id: AnySetId): TagSet {
 
 /**
  * Tag ids are unique app-wide. Numbered tags use the printed code (`1-3-002`).
- * Regular Tags are printed `R-1-n` (Stardust) or `R-2-n` (Galaxy) and the same code
- * appears in several sets, so only the original Stardust V3 ones keep the bare printed
- * code (`R-1-1`, shipped first); all others are `<set prefix>-R-<n>`, e.g. `1-2-R-1`
- * and `2-3-R-2`. The printed code is kept in `Tag.printedCode` for display.
+ * Regular Tags are one physical tag per series (the official Galaxy page says they
+ * appear throughout the series), so each printed Regular Tag has ONE id, its printed
+ * code: `R-1-n` (Stardust) and `R-2-n` (Galaxy). It belongs to every set of its series
+ * that lists it (see REGULAR_TAG_SETS). Stardust V1 lists none. The research doc records
+ * that the Regular Tags are the same Pokémon in every set that lists them.
  */
-export function regularTagId(set: TagSet, n: number): string {
-  return set.id === 'stardust-v3' ? `R-1-${n}` : `${set.prefix}-R-${n}`;
-}
+export const REGULAR_TAG_SETS: Record<'1' | '2', SetId[]> = {
+  '1': ['stardust-v2', 'stardust-v3', 'stardust-v4'],
+  '2': ['galaxy-v1', 'galaxy-v2', 'galaxy-v3'],
+};
+const REGULAR_SERIES_NAME = { '1': 'Stardust', '2': 'Galaxy' } as const;
+const REGULAR_ID = /^R-([12])-\d+$/;
 
-/** The set a tag id belongs to, derived from its prefix. */
-export function setOfTagId(id: string): TagSet | undefined {
-  if (isCustomId(id)) return MY_TAGS;
-  if (/^R-1-\d+$/.test(id)) return setById('stardust-v3');
+/** Every set that lists the tag: several for a Regular Tag, one for any other tag. */
+export function setsOfTagId(id: string): TagSet[] {
+  if (isCustomId(id)) return [MY_TAGS];
+  const series = REGULAR_ID.exec(id)?.[1] as '1' | '2' | undefined;
+  if (series) return REGULAR_TAG_SETS[series].map(setById);
   const prefix = /^(\d-\d)-/.exec(id)?.[1];
-  return SETS.find((s) => s.prefix === prefix);
+  const set = SETS.find((s) => s.prefix === prefix);
+  return set ? [set] : [];
 }
 
-export const setOfTag = (tag: Pick<Tag, 'id'>): TagSet | undefined => setOfTagId(tag.id);
+export const setsOfTag = (tag: Pick<Tag, 'id'>): TagSet[] => setsOfTagId(tag.id);
 
-/** What the physical tag shows, e.g. "R-2-1" for the namespaced id "2-3-R-1". */
+export const isInSet = (tag: Pick<Tag, 'id'>, setId: AnySetId): boolean => setsOfTag(tag).some((s) => s.id === setId);
+
+/** Short set label for display: the set name, or "Stardust (Regular)" for a Regular Tag. */
+export function setLabelOfId(id: string): string {
+  const series = REGULAR_ID.exec(id)?.[1] as '1' | '2' | undefined;
+  if (series) return `${REGULAR_SERIES_NAME[series]} (Regular)`;
+  return setsOfTagId(id)[0]?.name ?? '';
+}
+export const setLabel = (tag: Pick<Tag, 'id'>): string => setLabelOfId(tag.id);
+
+/** What the physical tag shows. Equal to the id except for player-added tags, which may record a code. */
 export const printedCode = (tag: Pick<Tag, 'id' | 'printedCode'>): string => tag.printedCode ?? tag.id;

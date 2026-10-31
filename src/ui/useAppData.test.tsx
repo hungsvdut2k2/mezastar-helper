@@ -25,7 +25,7 @@ it('loads saved data and applies corrections to every shipped tag', async () => 
     </WithStore>,
   );
   expect(await screen.findByText(`1-3-001 total=${TAGS.length} attack=321`)).toBeInTheDocument();
-  expect(TAGS.length).toBe(508);
+  expect(TAGS.length).toBe(496);
 });
 
 it('merges custom tags into store.tags, and refuses to delete one used in a saved play', async () => {

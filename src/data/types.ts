@@ -31,9 +31,9 @@ export type TagStats = {
 };
 
 export type Tag = {
-  /** Unique app-wide. The printed code, except namespaced Regular Tags (see setInfo.ts). */
+  /** Unique app-wide. The printed code (Regular Tags are R-1-n / R-2-n, one id per series; see setInfo.ts). */
   id: string;
-  /** Set only when the id differs from the code printed on the tag, e.g. "R-2-1". */
+  /** Set only for player-added tags, whose id is generated and differs from the code they record. */
   printedCode?: string;
   name: string;
   grade: Grade | null;

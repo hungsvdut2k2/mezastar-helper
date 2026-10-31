@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection, type TagStats } from '../../data/types';
-import { printedCode, setOfTag } from '../../data/setInfo';
+import { printedCode, setLabel } from '../../data/setInfo';
 import { gradeLabel, typeLabel } from '../format';
 import type { Rasterizer } from '../photo';
 import { PhotoSection } from './PhotoSection';
@@ -105,7 +105,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
         {tag.name} <small>{printedCode(tag)}</small>
       </h1>
       <p>
-        {setOfTag(tag)?.name && `${setOfTag(tag)?.name} · `}
+        {setLabel(tag) && `${setLabel(tag)} · `}
         {gradeLabel(tag.grade)}
         {tag.gimmick && ` · ${GIMMICK_NAME[tag.gimmick.kind]}${tag.gimmick.moveName ? `: ${tag.gimmick.moveName}` : ''}`}
       </p>

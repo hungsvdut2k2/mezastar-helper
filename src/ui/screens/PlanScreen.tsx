@@ -3,7 +3,7 @@ import type { Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import { unknownOpponent } from '../../engine/recommend';
 import { Recommendations } from '../components/Recommendations';
-import { setOfTag } from '../../data/setInfo';
+import { setLabel } from '../../data/setInfo';
 import { TagPicker } from '../components/TagPicker';
 import type { AppStore } from '../useAppData';
 
@@ -44,7 +44,7 @@ export function PlanScreen({ store }: { store: AppStore }) {
         <div className="chips">
           {superstars.map((t) => (
             <button key={t.id} type="button" onClick={() => setTarget(t)}>
-              {t.name} <small>{setOfTag(t)?.name}</small>
+              {t.name} <small>{setLabel(t)}</small>
             </button>
           ))}
         </div>

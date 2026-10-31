@@ -8,6 +8,14 @@ The tag page's "Go to a different Version" switcher lists, in this order: Stardu
 
 There are **no older series before Stardust** on the Asia site: Stardust V1 is the first set listed. The "Super Tag Battle / Double Chase / Gigantamax-era" naming is from the Japanese releases and was not found on the Asia site (Galaxy is the Asia set that follows Stardust V4 and introduces Double Move, Chain Tag and Gigantamax tags).
 
+## Typing rule for Mega tags
+
+Mega tags use the **base** Pokémon's typing, not the Mega form's. The tag fights as the base form until it Mega Evolves, and the Mega move's type is kept in the gimmick. Example: 1-1-009 Charizard is fire/flying (its Mega Charizard X is fire/dragon).
+
+## Regular Tags
+
+Regular Tags are one physical tag per series (the official Galaxy page says they appear throughout the series). The app uses one id per printed Regular Tag: `R-1-1..3` (Pikachu, Lucario, Snorlax; Dynamax) listed in Stardust V2, V3 and V4, and `R-2-1..3` (Pikachu, Charizard, Gengar; Gigantamax-capable) listed in Galaxy V1, V2 and V3. Stardust V1 lists none. Re-checked: the three tags are the same Pokemon with the same gimmick text on every page of a series, so no per-set ids are needed. A Regular Tag belongs to every set that lists it.
+
 ## Reading the tables
 
 - Grade: the page groups tags as Superstar (codes 001-010, recorded as 6), Star (011-025, 5) and "2~4 stars" (026-070, shown `?(2-4)`; per-tag grade not on the page). Regular Tags `?`.
@@ -21,7 +29,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 - Source: https://world.pokemonmezastar.com/sg/tag/28933/
 - Release period: not stated on the site
 - Total tags recorded: 70
-- Notes: No Regular Tags are listed on the V1 page (R-1-x tags appear from V2). Page notes Ga-Olé Lucky Star Disks only work with V1. Zacian/Zamazenta types assume Crowned forms (Behemoth moves); the page does not name the form. 1-1-009 is recorded as fire/dragon (Mega Charizard X's typing, as the page's Mega section names Mega Charizard X).
+- Notes: No Regular Tags are listed on the V1 page (R-1-x tags appear from V2). Page notes Ga-Olé Lucky Star Disks only work with V1. Zacian/Zamazenta types assume Crowned forms (Behemoth moves); the page does not name the form. 1-1-009 is recorded as fire/flying (base Charizard; see the Mega typing rule below). The page's Mega section names Mega Charizard X.
 
 | code | name | grade | types | move | gimmick | flags | confidence |
 |---|---|---|---|---|---|---|---|
@@ -33,7 +41,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 | 1-1-006 | Metagross | 6 | steel, psychic | - | - | - | official |
 | 1-1-007 | Miraidon | 6 | electric, dragon | Electro Drift (electric) | - | legendary | official |
 | 1-1-008 | Venusaur | 6 | grass, poison | - | Mega Venusaur: Leaf Storm (grass) | - | official |
-| 1-1-009 | Charizard | 6 | fire, dragon | - | Mega Charizard X: Flamethrower (fire) | - | official |
+| 1-1-009 | Charizard | 6 | fire, flying | - | Mega Charizard X: Flamethrower (fire) | - | official |
 | 1-1-010 | Blastoise | 6 | water | - | Mega Blastoise: Hydro Pump (water) | - | official |
 | 1-1-011 | Vaporeon | 5 | water | - | - | - | official |
 | 1-1-012 | Flareon | 5 | fire | - | - | - | official |
@@ -267,7 +275,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 - Source: https://world.pokemonmezastar.com/sg/tag/36251/
 - Release period: not stated on the site
 - Total tags recorded: 73
-- Notes: Galaxy is the series that follows Stardust V4 on the Asia site. Toxtricity 021=Amped / 022=Low Key is inferred from page order (community); 059/060 likewise presumed Amped/Low Key, not stated. Which Pikachu etc. gimmick data apply to the final-evolution duplicates (e.g. Rillaboom 034) is not stated; gimmicks are attached only to the Superstar/Star tags.
+- Notes: Galaxy is the series that follows Stardust V4 on the Asia site. Toxtricity 021=Amped / 022=Low Key is inferred from page order and named that way in the app (confidence community; the move names Overdrive and Sludge Wave support the split); 059/060 likewise presumed Amped/Low Key, not stated. Which Pikachu etc. gimmick data apply to the final-evolution duplicates (e.g. Rillaboom 034) is not stated; gimmicks are attached only to the Superstar/Star tags.
 
 | code | name | grade | types | move | gimmick | flags | confidence |
 |---|---|---|---|---|---|---|---|
@@ -291,8 +299,8 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 | 2-1-018 | Arctovish | 5 | water, ice | - | - | - | official |
 | 2-1-019 | Electivire | 5 | electric | - | Chain Tag: Wild Charge (electric) | - | official |
 | 2-1-020 | Magmortar | 5 | fire | - | Chain Tag: Flamethrower (fire) | - | official |
-| 2-1-021 | Toxtricity | 5 | electric, poison | Overdrive (electric) | Chain Tag: Overdrive (electric) (Amped Form) | - | official |
-| 2-1-022 | Toxtricity | 5 | electric, poison | Sludge Wave (poison) | Chain Tag: Sludge Wave (poison) (Low Key Form) | - | official |
+| 2-1-021 | Toxtricity (Amped) | 5 | electric, poison | Overdrive (electric) | Chain Tag: Overdrive (electric) (Amped Form) | - | community |
+| 2-1-022 | Toxtricity (Low Key) | 5 | electric, poison | Sludge Wave (poison) | Chain Tag: Sludge Wave (poison) (Low Key Form) | - | community |
 | 2-1-023 | Great Tusk | 5 | ground, fighting | - | - | paradox | official |
 | 2-1-024 | Vikavolt | 5 | bug, electric | - | - | - | official |
 | 2-1-025 | Abomasnow | 5 | grass, ice | - | - | - | official |
@@ -433,7 +441,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 - Source: https://world.pokemonmezastar.com/sg/tag/39325/
 - Release period: not stated on the site
 - Total tags recorded: 73
-- Notes: Regular Tags use the same R-2-x codes as Galaxy V1/V2.
+- Notes: Regular Tags use the same R-2-x codes as Galaxy V1/V2. Regigigas (2-3-006) and Obstagoon (2-3-010): the page lists them under the Double Move heading but names no moves, so their Double Move is unconfirmed and the app keeps their gimmick null.
 
 | code | name | grade | types | move | gimmick | flags | confidence |
 |---|---|---|---|---|---|---|---|
@@ -513,7 +521,7 @@ There are **no older series before Stardust** on the Asia site: Stardust V1 is t
 
 ## Spot-check against the live pages (build step)
 
-Re-read all six pages: codes and names for 001-030 and 041-070 (all sets, sampled ranges 031-059 too) matched, as did every feature section (moves and types). Corrections: Mega Charizard X typing (1-1-009 fire/dragon); Calyrex Ice/Shadow code mapping is not on the page (confidence lowered to community). Confirmed unresolved: both 1-4-008/009 are plain "Kyurem" with no form on the page (kept as base Kyurem dragon/ice, no Black/White); Toxtricity 2-1-021/022/060 forms are not mapped to codes; Regigigas and Obstagoon (2-3-006/010) "also appear" in the Double Move section with no move names, so the app records no gimmick for them. Regular Tags: the page's Dynamax/Gigantamax text names no moves.
+Re-read all six pages: codes and names for 001-030 and 041-070 (all sets, sampled ranges 031-059 too) matched, as did every feature section (moves and types). Corrections: 1-1-009 Charizard typing (fire/flying, base form; an earlier pass used Mega Charizard X's fire/dragon); Calyrex Ice/Shadow code mapping is not on the page (confidence lowered to community). Confirmed unresolved: both 1-4-008/009 are plain "Kyurem" with no form on the page (kept as base Kyurem dragon/ice, no Black/White); Toxtricity 2-1-021/022/060 forms are not mapped to codes; Regigigas and Obstagoon (2-3-006/010) "also appear" in the Double Move section with no move names, so the app records no gimmick for them. Regular Tags: the page's Dynamax/Gigantamax text names no moves.
 
 ## Open gaps
 
@@ -523,5 +531,5 @@ Re-read all six pages: codes and names for 001-030 and 041-070 (all sets, sample
 - Move names for the many tags with no feature text; Regular Tags' Dynamax/G-Max move names.
 - Stardust V1: no Regular Tags listed (confirm none exist); which Pikachu has Dynamax (019 vs 042); Zacian/Zamazenta form.
 - Stardust V4: Calyrex Ice/Shadow order and the two Kyurem forms; TAG Move partners are not themselves tags in the set.
-- Galaxy V1: Toxtricity Amped/Low Key order; Galaxy V3: whether Regigigas/Obstagoon are Double Move tags.
+- Galaxy V1: Toxtricity Amped/Low Key order; Galaxy V3: whether Regigigas/Obstagoon are Double Move tags (unconfirmed: the page lists them under the Double Move heading with no move names, so the app keeps gimmick null for both).
 - Official-page text was read via an automated summariser; spot-check codes against the live pages before importing.
