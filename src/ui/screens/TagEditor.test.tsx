@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TAGS } from '../../data/tags';
 import { TagEditor } from './TagEditor';
@@ -27,6 +27,16 @@ function setup(extra: Partial<React.ComponentProps<typeof TagEditor>> = {}) {
   );
   return { onSetPhoto, onRemovePhoto, user: userEvent.setup() };
 }
+
+it('offers grades 1 to 6 and saves a grade of 1 as a correction', async () => {
+  const onSave = vi.fn();
+  const { user } = setup({ onSave });
+  const options = within(screen.getByLabelText('Grade')).getAllByRole('option').map((o) => o.textContent);
+  expect(options).toEqual(['unknown', '1★', '2★', '3★', '4★', '5★', '6★']);
+  await user.selectOptions(screen.getByLabelText('Grade'), '1');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  expect(onSave).toHaveBeenCalledWith({ grade: 1 });
+});
 
 it('offers Add photo, processes the file and hands over the blob', async () => {
   const { user, onSetPhoto } = setup();

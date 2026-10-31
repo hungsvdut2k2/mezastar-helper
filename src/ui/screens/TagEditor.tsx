@@ -118,7 +118,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
         Grade
         <select value={grade} onChange={(e) => setGrade(e.target.value)}>
           <option value="">unknown</option>
-          {[2, 3, 4, 5, 6].map((g) => (
+          {[1, 2, 3, 4, 5, 6].map((g) => (
             <option key={g} value={g}>
               {g}★
             </option>
