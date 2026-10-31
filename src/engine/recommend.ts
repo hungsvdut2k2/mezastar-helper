@@ -1,5 +1,5 @@
 import type { Tag } from '../data/types';
-import type { Battle } from './battleModel';
+import { UNKNOWN_PREFIX, type Battle } from './battleModel';
 import { bestPlan, type PlanResult } from './planSearch';
 import { topTeams, type TeamScore } from './teamScoring';
 
@@ -10,9 +10,9 @@ export function recommend(owned: Tag[], battle: Battle, count = 3): Recommendati
 }
 
 /** Stand-in for a crony the player did not enter (Plan screen). No type and no move = neutral matchups. */
-export function unknownOpponent(id: string): Tag {
+export function unknownOpponent(slot: 1 | 2): Tag {
   return {
-    id,
+    id: `${UNKNOWN_PREFIX}${slot}`,
     name: 'Unknown crony',
     grade: null,
     types: [],

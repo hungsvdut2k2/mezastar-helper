@@ -1,8 +1,11 @@
 import type { Gimmick, PokemonType, Tag } from '../data/types';
 import { effectiveness } from './typeEffectiveness';
 
+/** Id prefix of the stand-in crony; unknownOpponent() is the only place that builds such an id. */
+export const UNKNOWN_PREFIX = 'unknown-';
+
 /** True for the stand-in crony the Plan screen uses when the player did not enter one (see unknownOpponent). */
-export const isUnknownOpponent = (t: Tag) => t.id.startsWith('unknown-');
+export const isUnknownOpponent = (t: Tag) => t.id.startsWith(UNKNOWN_PREFIX);
 
 /** Placeholder constants. Measure with the play log before changing them. */
 export const MODEL = {

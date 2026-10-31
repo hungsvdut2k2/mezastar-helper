@@ -70,7 +70,7 @@ describe('scoreTeam', () => {
     const ghostMove = makeTag('ghostMove', { move: { name: 'Lick', type: 'ghost' } });
     const fightingMove = makeTag('fightingMove', { move: { name: 'Karate Chop', type: 'fighting' } });
     const battle: Battle = {
-      opponents: [makeTag('boss', { types: ['fire'] }), unknownOpponent('u1'), unknownOpponent('u2')],
+      opponents: [makeTag('boss', { types: ['fire'] }), unknownOpponent(1), unknownOpponent(2)],
       targetIndex: 0,
     };
     expect(hitPower(ghostMove, battle.opponents[1])).toBe(hitPower(fightingMove, battle.opponents[1]));

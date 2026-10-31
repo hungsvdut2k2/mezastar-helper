@@ -1,5 +1,5 @@
 import { makeTag } from '../test/factories';
-import type { Battle } from './battleModel';
+import { isUnknownOpponent, type Battle } from './battleModel';
 import { recommend, unknownOpponent } from './recommend';
 
 const battle: Battle = { opponents: [makeTag('boss'), makeTag('c1'), makeTag('c2')], targetIndex: 0 };
@@ -20,8 +20,13 @@ describe('recommend', () => {
 });
 
 describe('unknownOpponent', () => {
+  it('builds ids that isUnknownOpponent recognises', () => {
+    expect(isUnknownOpponent(unknownOpponent(1))).toBe(true);
+    expect(unknownOpponent(1).id).not.toBe(unknownOpponent(2).id);
+  });
+
   it('is a neutral placeholder with unknown stats', () => {
-    const o = unknownOpponent('x');
+    const o = unknownOpponent(1);
     expect(o.name).toBe('Unknown crony');
     expect(Object.values(o.stats).every((v) => v === null)).toBe(true);
     expect(o.types).toEqual([]); // no type: every matchup counts as neutral
@@ -29,7 +34,7 @@ describe('unknownOpponent', () => {
 
   it('can be planned against', () => {
     const owned = ['a', 'b', 'c'].map((id) => makeTag(id));
-    const withUnknown: Battle = { opponents: [makeTag('boss'), unknownOpponent('u1'), unknownOpponent('u2')], targetIndex: 0 };
+    const withUnknown: Battle = { opponents: [makeTag('boss'), unknownOpponent(1), unknownOpponent(2)], targetIndex: 0 };
     const [rec] = recommend(owned, withUnknown);
     expect(rec.reason).toContain('Unknown crony (crony): Hit');
     expect(rec.plan?.steps.length).toBeGreaterThan(0);

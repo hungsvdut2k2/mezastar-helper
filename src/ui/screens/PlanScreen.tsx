@@ -20,7 +20,7 @@ export function PlanScreen({ store }: { store: AppStore }) {
     () =>
       target
         ? {
-            opponents: [target, crony1 ?? unknownOpponent('unknown-1'), crony2 ?? unknownOpponent('unknown-2')],
+            opponents: [target, crony1 ?? unknownOpponent(1), crony2 ?? unknownOpponent(2)],
             targetIndex: 0,
           }
         : null,

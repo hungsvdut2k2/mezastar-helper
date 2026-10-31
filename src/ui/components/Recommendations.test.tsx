@@ -49,7 +49,7 @@ it('does not show the rough-estimates hint on a rule-of-thumb plan', () => {
 
 it('tells the player to enter real opponents when a crony is the unknown placeholder', () => {
   const planBattle: Battle = {
-    opponents: [byId('1-3-001'), unknownOpponent('unknown-1'), unknownOpponent('unknown-2')],
+    opponents: [byId('1-3-001'), unknownOpponent(1), unknownOpponent(2)],
     targetIndex: 0,
   };
   render(<Recommendations owned={owned} battle={planBattle} />);
