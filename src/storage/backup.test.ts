@@ -253,6 +253,26 @@ describe('custom tags in backups', () => {
     if (!result.ok) expect(result.error).toContain('custom tags');
   });
 
+  it('rejects a play that uses a custom tag missing from the backup, naming it', () => {
+    const entry = makeLogEntry({ turns: [{ attacker: '1-3-001', defeated: 'my-ghost', predictedDefeat: false }] });
+    const result = parseBackup(wrap({ log: [entry] }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('A saved play uses a tag you added (my-ghost) that is not in the backup.');
+    for (const part of [{ boss: 'my-ghost' }, { target: 'my-ghost' }, { caught: 'my-ghost' }, { cronies: ['my-ghost'] }, { teamUsed: ['my-ghost'] }]) {
+      expect(parseBackup(wrap({ log: [makeLogEntry(part)] })).ok).toBe(false);
+    }
+  });
+
+  it('accepts a play that uses a custom tag included in the backup', () => {
+    const entry = makeLogEntry({ target: 'my-abc-1', teamUsed: ['my-abc-1'] });
+    expect(parseBackup(wrap({ customTags: [custom()], log: [entry] })).ok).toBe(true);
+  });
+
+  it('accepts grade 1 in a correction too', () => {
+    expect(parseBackup(wrap({ corrections: { '1-3-001': { grade: 1 } } })).ok).toBe(true);
+    expect(parseBackup(wrap({ corrections: { '1-3-001': { grade: 0 } } })).ok).toBe(false);
+  });
+
   it('accepts grade 1 and null, and rejects duplicate ids and non-arrays', () => {
     expect(parseBackup(wrap({ customTags: [custom({ grade: 1 }), custom({ id: 'my-2', grade: null })] })).ok).toBe(true);
     expect(parseBackup(wrap({ customTags: [custom(), custom()] })).ok).toBe(false);

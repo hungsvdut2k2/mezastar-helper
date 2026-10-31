@@ -1,4 +1,5 @@
 import { CUSTOM_ID_PATTERN, CUSTOM_SOURCE, MAX_CODE_LENGTH, MAX_MOVE_LENGTH, MAX_NAME_LENGTH } from '../data/customTag';
+import { tagIdsInPlay } from '../engine/customTags';
 import { isCustomId } from '../data/setInfo';
 import { GIMMICKS, POKEMON_TYPES, type Gimmick, type Grade, type PlayLogEntry, type PokemonType, type Tag, type TagCorrection } from '../data/types';
 import { TAGS } from '../data/tags';
@@ -75,7 +76,7 @@ function isCorrection(v: unknown): v is TagCorrection {
   if (!isObject(v)) return false;
   const { grade, types, pokenergy, stats, move } = v;
   return (
-    optional(grade, (g) => g === null || (Number.isInteger(g) && (g as number) >= 2 && (g as number) <= 6)) &&
+    optional(grade, (g) => g === null || (Number.isInteger(g) && (g as number) >= 1 && (g as number) <= 6)) &&
     optional(types, (t) => Array.isArray(t) && t.length >= 1 && t.length <= 2 && t.every(isType) && new Set(t).size === t.length) &&
     optional(pokenergy, (p) => p === null || isCount(p)) &&
     optional(
@@ -186,6 +187,10 @@ export function parseBackup(text: string): ParseResult {
   const refersToMissingCustom = (ids: string[]) => ids.some((id) => isCustomId(id) && !customIds.has(id));
   if (refersToMissingCustom(owned)) return damaged('owned tags');
   if (refersToMissingCustom(Object.keys(corrections))) return damaged('corrections');
+  for (const entry of log) {
+    const missing = tagIdsInPlay(entry).find((id) => isCustomId(id) && !customIds.has(id));
+    if (missing) return { ok: false, error: `A saved play uses a tag you added (${missing}) that is not in the backup.` };
+  }
   const photos: Record<string, Blob> = {};
   if (raw.photos !== undefined) {
     if (!isObject(raw.photos)) return damaged('photos');
