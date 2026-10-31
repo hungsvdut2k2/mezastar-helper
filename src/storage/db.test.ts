@@ -158,4 +158,25 @@ describe('storage', () => {
     await putCustomTag(makeTag('my-1'));
     expect((await loadAll()).customTags).toHaveLength(1);
   });
+
+  it('upgrades a version 2 database that has only the photos store', async () => {
+    const v2 = await openDB('mezastar-helper', 2, {
+      upgrade(db) {
+        db.createObjectStore('owned');
+        db.createObjectStore('corrections');
+        db.createObjectStore('notes');
+        db.createObjectStore('log', { keyPath: 'id' });
+        db.createObjectStore('photos');
+      },
+    });
+    await v2.put('owned', true, '1-3-001');
+    await v2.put('photos', { type: 'image/png', bytes: new Uint8Array([1, 2]).buffer }, '1-3-001');
+    v2.close();
+    const data = await loadAll();
+    expect(data.owned).toEqual(['1-3-001']);
+    expect(data.customTags).toEqual([]);
+    expect(Object.keys(await getAllPhotos())).toEqual(['1-3-001']);
+    await putCustomTag(makeTag('my-1'));
+    expect((await loadAll()).customTags.map((t) => t.id)).toEqual(['my-1']);
+  });
 });

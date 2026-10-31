@@ -45,7 +45,7 @@ export function onDbBlocked(listener: () => void) {
 
 function getDb() {
   if (!dbPromise) {
-    const opening = openDB<HelperDB>(DB_NAME, 2, {
+    const opening = openDB<HelperDB>(DB_NAME, 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('owned');
@@ -53,8 +53,12 @@ function getDb() {
           db.createObjectStore('notes');
           db.createObjectStore('log', { keyPath: 'id' });
         }
-        if (oldVersion < 2) {
+        // Version 2 shipped only the photos store; customTags arrived in version 3. Each step is
+        // guarded so a database from any earlier build (including a v2 with photos only) upgrades cleanly.
+        if (oldVersion < 2 && !db.objectStoreNames.contains('photos')) {
           db.createObjectStore('photos');
+        }
+        if (oldVersion < 3 && !db.objectStoreNames.contains('customTags')) {
           db.createObjectStore('customTags', { keyPath: 'id' });
         }
       },
