@@ -32,6 +32,8 @@ export const MECHANICS: Mechanic[] = [
     explanation: 'Your attack power comes from the Attack Roulette or from hitting the buttons. A rainbow result is the maximum.' },
   { id: 'support-pokemon', title: 'Support Pokémon', trust: 'confirmed', sources: [SUPPORT],
     explanation: 'When you defeat an opponent that is not the Boss, it becomes your Support Pokémon from the next turn. After each Attack Roulette, a Support Roulette gives +10 attack or a Support Attack.' },
+  { id: 'defeated-crony-catchable', title: 'Defeated cronies can still be caught', trust: 'player', sources: ['Confirmed by the player at the machine, 2026-10-31'],
+    explanation: 'A crony you defeat joins you as a Support Pokémon and can still be caught at Catch Time. Defeating a crony you want to catch does not lose it.' },
   { id: 'support-ticket', title: 'Support Pokémon Ticket', trust: 'confirmed', sources: [TICKETS],
     explanation: 'A Support Pokémon Ticket (max 1 per battle) gives you a supporter from the start. Scan it before placing any tags.' },
   { id: 'first-attack-moves', title: 'Special moves on the first attack', trust: 'confirmed', sources: [DYNAMAX, CHAIN, SET_LIST],

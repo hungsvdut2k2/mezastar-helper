@@ -31,11 +31,57 @@ export type PlanResult = {
   steps: PlanStep[];
   score: number | null;
   comparison: string;
+  /** True when some HP / Attack / Defense / Speed (team or opponents) is unknown and counted as average. */
+  usesUnknownStats: boolean;
 };
 
 type Found = { turns: Turn[]; result: SimResult };
 
 const AIMS = [0, 1, 2] as const;
+
+export function planUsesUnknownStats(team: Tag[], battle: Battle): boolean {
+  return [...team, ...battle.opponents].some((t) => Object.values(t.stats).some((v) => v === null));
+}
+
+const EPS = 1e-9;
+const diff = (a: number, b: number) => (Math.abs(a - b) <= EPS ? 0 : a - b);
+
+/** Damage on the target after turn 1, 2 and 3 (running total). */
+function targetDamageByTurn(result: SimResult, battle: Battle): number[] {
+  let sum = 0;
+  return Array.from({ length: MODEL.maxTurns }, (_, i) => {
+    const o = result.outcomes[i];
+    if (o && o.turn.aimAt === battle.targetIndex) sum += o.damageDealt;
+    return sum;
+  });
+}
+
+/** Damage on a Boss that is not the target: it risks ending the battle early. */
+function nonTargetBossDamage(result: SimResult, battle: Battle): number {
+  if (battle.targetIndex === 0) return 0;
+  return result.outcomes.filter((o) => o.turn.aimAt === 0).reduce((sum, o) => sum + o.damageDealt, 0);
+}
+
+/**
+ * Positive when plan a is better than plan b. Highest score first; ties go to
+ * earlier damage on the target, then less damage on a non-target Boss, then fewer
+ * lost tags, then the shorter plan. Remaining ties keep the first plan found.
+ */
+function comparePlans(a: Found, b: Found, battle: Battle): number {
+  let d = diff(a.result.score, b.result.score);
+  if (d) return d;
+  const ta = targetDamageByTurn(a.result, battle);
+  const tb = targetDamageByTurn(b.result, battle);
+  for (let i = 0; i < ta.length; i++) {
+    d = diff(ta[i], tb[i]);
+    if (d) return d;
+  }
+  d = diff(nonTargetBossDamage(b.result, battle), nonTargetBossDamage(a.result, battle));
+  if (d) return d;
+  d = b.result.tagsLost - a.result.tagsLost;
+  if (d) return d;
+  return b.turns.length - a.turns.length;
+}
 
 export function hasKeyStats(team: Tag[], battle: Battle): boolean {
   return (
@@ -44,16 +90,13 @@ export function hasKeyStats(team: Tag[], battle: Battle): boolean {
   );
 }
 
-/** Try every legal sequence of (tag, opponent) turns and keep the highest score. */
+/** Try every legal sequence of (tag, opponent) turns and keep the best (see comparePlans). */
 export function searchBestTurns(team: Tag[], battle: Battle): Found | null {
   const state: { best: Found | null } = { best: null };
 
   const consider = (turns: Turn[], result: SimResult) => {
-    const best = state.best;
-    const better = !best || result.score > best.result.score + 1e-9;
-    const tieButShorter =
-      best !== null && Math.abs(result.score - best.result.score) <= 1e-9 && turns.length < best.turns.length;
-    if (better || tieButShorter) state.best = { turns, result };
+    const candidate = { turns, result };
+    if (!state.best || comparePlans(candidate, state.best, battle) > 0) state.best = candidate;
   };
 
   const explore = (prefix: Turn[], result: SimResult | null) => {
@@ -107,15 +150,18 @@ function searchedStep(team: Tag[], battle: Battle, o: TurnOutcome, index: number
   const tag = team[o.turn.tagIndex];
   const aim = o.turn.aimAt;
   const opp = battle.opponents[aim];
+  const isTarget = aim === battle.targetIndex;
+  // Relies on choosing which opponent to hit (seen by the player). Defeats are model
+  // predictions, so they say "model estimate" and are never marked Official.
+  const trust: Trust = 'player';
   let why: string;
-  let trust: Trust = 'player'; // relies on choosing which opponent to hit
   if (o.defeated && aim === 0) {
-    why = 'Beats the Boss, so Catch Time starts.';
-    trust = 'confirmed';
+    why = 'Expected to beat the Boss (model estimate), so Catch Time starts.';
+  } else if (o.defeated && isTarget) {
+    why = `Expected to defeat ${opp.name} (model estimate); it joins you as Support Pokémon and can still be caught at Catch Time.`;
   } else if (o.defeated) {
-    why = `Defeats ${opp.name}; it becomes your Support Pokémon from next turn.`;
-    trust = 'confirmed';
-  } else if (aim === battle.targetIndex) {
+    why = `Expected to defeat ${opp.name} (model estimate); it becomes your Support Pokémon from next turn.`;
+  } else if (isTarget) {
     why = 'Builds damage on your target to fill the Catch Gauge.';
   } else {
     why = `Wears down ${opp.name} (not expected to fall this turn).`;
@@ -131,7 +177,7 @@ function searchedStep(team: Tag[], battle: Battle, o: TurnOutcome, index: number
     aimAtIndex: aim,
     aimAtId: opp.id,
     aimAtLabel: aimLabel(battle, aim),
-    isTarget: aim === battle.targetIndex,
+    isTarget,
     expectedDamage: Math.round(o.damageDealt),
     expectDefeat: o.defeated,
     why,
@@ -144,8 +190,8 @@ function ruleStep(team: Tag[], battle: Battle, turn: Turn, index: number): PlanS
   const opp = battle.opponents[turn.aimAt];
   const reasons: [string, Trust][] = [
     [`Try to defeat ${opp.name} first so it becomes your Support Pokémon.`, 'community'],
-    ['Use a different tag: the first one is tired.', 'confirmed'],
-    ['Your strongest hit on the target.', 'player'],
+    ['Use a different tag: the first one is tired (it would act later, without the Roulette boost).', 'confirmed'],
+    ['Your strongest available hit on the target.', 'player'],
   ];
   const [why, trust] = reasons[index];
   return {
@@ -163,15 +209,37 @@ function ruleStep(team: Tag[], battle: Battle, turn: Turn, index: number): PlanS
   };
 }
 
+/**
+ * Plays the usual plan only as far as it stays legal: it may aim at an opponent that is
+ * already defeated, or reuse a tag that was knocked out.
+ */
+function simulateLegalStart(team: Tag[], battle: Battle, turns: Turn[]): Found {
+  for (let n = turns.length; n > 0; n--) {
+    const result = simulate(team, battle, turns.slice(0, n));
+    if (result) return { turns: turns.slice(0, n), result };
+  }
+  return { turns: [], result: simulate(team, battle, [])! };
+}
+
 function compareWithDefault(team: Tag[], battle: Battle, best: Found, defaultTurns: Turn[]): string {
   const same =
     best.turns.length === defaultTurns.length &&
     best.turns.every((t, i) => t.tagIndex === defaultTurns[i].tagIndex && t.aimAt === defaultTurns[i].aimAt);
   if (same) return 'This is the usual crony-first plan, and it is the best here.';
-  const def = simulate(team, battle, defaultTurns);
-  if (!def) return 'The usual crony-first plan does not fit this battle, so use this one.';
+  const def = simulateLegalStart(team, battle, defaultTurns).result;
   const gain = Math.round(best.result.score - def.score);
   if (gain <= 0) return 'This plan and the usual crony-first plan are about equal here.';
+
+  const lostAt = def.outcomes.findIndex((o) => o.tagLost);
+  if (lostAt >= 0 && def.tagsLost > best.result.tagsLost) {
+    const o = def.outcomes[lostAt];
+    const avoids = best.result.tagsLost === 0 ? 'avoids that' : 'loses fewer tags';
+    return `The usual crony-first plan would lose ${team[o.turn.tagIndex].name} to ${battle.opponents[o.turn.aimAt].name} on turn ${lostAt + 1}; this plan ${avoids}.`;
+  }
+
+  // Report damage on the target when that is where the gain is; otherwise plain points
+  // (the score also counts the Boss-defeat bonus and lost tags).
+  const moreDamage = Math.round(best.result.damageToTarget - def.damageToTarget);
   if (best.turns[0].aimAt === battle.targetIndex) {
     const targetLabel = battle.targetIndex === 0 ? 'the Boss' : battle.opponents[battle.targetIndex].name;
     const cronies = ([1, 2] as const).filter((i) => i !== battle.targetIndex);
@@ -179,9 +247,11 @@ function compareWithDefault(team: Tag[], battle: Battle, best: Found, defaultTur
       team.every((t) => damage(t, battle.opponents[c], true) < statOrNeutral(battle.opponents[c].stats.hp)),
     );
     if (noOneHit) return `Hitting ${targetLabel} on turn 1 is better here: no crony can be defeated in one hit.`;
-    return `Hitting ${targetLabel} on turn 1 is better here (about ${gain} more expected damage than crony-first).`;
+    const amount = moreDamage > 0 ? `about ${moreDamage} more damage on your target` : `about ${gain} more points`;
+    return `Hitting ${targetLabel} on turn 1 is better here (${amount} than crony-first).`;
   }
-  return `This plan beats the usual crony-first plan by about ${gain} expected damage.`;
+  const by = moreDamage > 0 ? `about ${moreDamage} damage on your target` : `about ${gain} points`;
+  return `This plan beats the usual crony-first plan by ${by}.`;
 }
 
 export function bestPlan(team: Tag[], battle: Battle): PlanResult | null {
@@ -194,14 +264,20 @@ export function bestPlan(team: Tag[], battle: Battle): PlanResult | null {
       score: null,
       comparison:
         'Some HP, Attack or Speed values are unknown, so this is the usual rule of thumb. Add them in Collection for a searched plan.',
+      usesUnknownStats: true,
     };
   }
   const found = searchBestTurns(team, battle);
   if (!found) return null;
+  const usesUnknownStats = planUsesUnknownStats(team, battle);
+  const comparison = compareWithDefault(team, battle, found, defaultTurns);
   return {
     kind: 'searched',
     steps: found.result.outcomes.map((o, i) => searchedStep(team, battle, o, i)),
     score: found.result.score,
-    comparison: compareWithDefault(team, battle, found, defaultTurns),
+    comparison: usesUnknownStats
+      ? `${comparison} Some Attack, Defense or Speed values are unknown and counted as average, so the numbers are rough.`
+      : comparison,
+    usesUnknownStats,
   };
 }

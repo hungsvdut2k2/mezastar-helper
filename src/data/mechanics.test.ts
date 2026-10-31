@@ -20,6 +20,12 @@ describe('mechanics', () => {
     expect(tired.trust).toBe('player');
     expect(tired.explanation).toMatch(/can still attack/);
   });
+
+  it('records that a defeated crony can still be caught', () => {
+    const m = MECHANICS.find((x) => x.id === 'defeated-crony-catchable')!;
+    expect(m.trust).toBe('player');
+    expect(m.explanation).toMatch(/still be caught/);
+  });
 });
 
 describe('open questions', () => {
