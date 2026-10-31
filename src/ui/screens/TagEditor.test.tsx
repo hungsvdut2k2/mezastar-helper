@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TAGS } from '../../data/tags';
 import { TagEditor } from './TagEditor';
@@ -45,13 +45,12 @@ it('shows the preview with Change and Remove when a photo exists', async () => {
 });
 
 it('rejects a non-image with a message and stores nothing', async () => {
-  const { user, onSetPhoto } = setup();
+  const { onSetPhoto } = setup();
   // applyAccept off: the picker filter is advisory, so the code must check too.
   const u = userEvent.setup({ applyAccept: false });
   await u.upload(screen.getByLabelText('Add photo'), new File(['x'], 'a.txt', { type: 'text/plain' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('not an image');
   expect(onSetPhoto).not.toHaveBeenCalled();
-  void user;
 });
 
 it('shows an error when the image cannot be decoded', async () => {
@@ -61,8 +60,18 @@ it('shows an error when the image cannot be decoded', async () => {
   expect(onSetPhoto).not.toHaveBeenCalled();
 });
 
-it('shows an error when storing fails', async () => {
-  const { user } = setup({ onSetPhoto: async () => false });
+it('adds no second message when storing fails (the app-wide banner covers it)', async () => {
+  const onSetPhoto = vi.fn(async (_b: Blob) => false);
+  const { user } = setup({ onSetPhoto });
   await user.upload(screen.getByLabelText('Add photo'), picture());
-  expect(await screen.findByRole('alert')).toHaveTextContent('Could not save the photo.');
+  await waitFor(() => expect(onSetPhoto).toHaveBeenCalled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+it('adds no second message when removing fails', async () => {
+  const onRemovePhoto = vi.fn(async () => false);
+  const { user } = setup({ photoUrl: 'blob:x', onRemovePhoto });
+  await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+  await waitFor(() => expect(onRemovePhoto).toHaveBeenCalled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

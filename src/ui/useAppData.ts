@@ -6,6 +6,7 @@ import { blobToDataUrl, restoreFromText, type ParseResult } from '../storage/bac
 import * as db from '../storage/db';
 import type { AppData } from '../storage/db';
 
+const BLOCKED_MESSAGE = 'Close other Mezastar Helper tabs, then reopen the app.';
 const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [] };
 
 type Pending = { newest: number; inflight: number; saved: PlayLogEntry | undefined };
@@ -31,25 +32,36 @@ export function useAppData() {
   const photoUrls = useRef(new Map<string, string>());
   const [photos, setPhotosState] = useState<Map<string, string>>(new Map());
   const syncPhotos = () => setPhotosState(new Map(photoUrls.current));
+  // False once the app is gone: async work that finishes later must not leave object URLs behind.
+  const alive = useRef(false);
+  // Counts completed restores. A photo change that began before one must not touch the restored photos.
+  const restoreGeneration = useRef(0);
   /** Show exactly these photos; every previous object URL is revoked. */
   const replacePhotoUrls = (blobs: Record<string, Blob>) => {
     for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
-    photoUrls.current = new Map(Object.entries(blobs).map(([id, blob]) => [id, URL.createObjectURL(blob)]));
-    syncPhotos();
+    photoUrls.current = alive.current ? new Map(Object.entries(blobs).map(([id, blob]) => [id, URL.createObjectURL(blob)])) : new Map();
+    if (alive.current) syncPhotos();
   };
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    alive.current = true;
+    const stopBlockedWatch = db.onDbBlocked(() => setError(BLOCKED_MESSAGE));
     Promise.all([db.loadAll(), db.getAllPhotos().catch(() => ({}) as Record<string, Blob>)])
       .then(([loadedData, blobs]) => {
+        if (!alive.current) return;
         setData(loadedData);
         replacePhotoUrls(blobs);
+        // The upgrade was only waiting for another tab: all fine now.
+        setError((e) => (e === BLOCKED_MESSAGE ? null : e));
       })
       .catch(() => setError('Could not open storage on this phone. Changes will not be saved.'))
       .finally(() => setLoaded(true));
     // Let go of the object URLs when the app goes away.
     return () => {
+      alive.current = false;
+      stopBlockedWatch();
       for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
       photoUrls.current.clear();
     };
@@ -105,12 +117,16 @@ export function useAppData() {
     dismissError: () => setError(null),
     /** Save an already-processed photo. The picture appears once it is stored. */
     async setPhoto(id: string, blob: Blob): Promise<boolean> {
+      const generation = restoreGeneration.current;
       try {
         await db.putPhoto(id, blob);
       } catch {
-        setError('Your photo was not saved.');
+        if (alive.current) setError('Your photo was not saved.');
         return false;
       }
+      // A restore finished meanwhile: it decides what the photos are now.
+      if (generation !== restoreGeneration.current) return false;
+      if (!alive.current) return true;
       const old = photoUrls.current.get(id);
       photoUrls.current.set(id, URL.createObjectURL(blob));
       if (old) URL.revokeObjectURL(old);
@@ -118,12 +134,15 @@ export function useAppData() {
       return true;
     },
     async removePhoto(id: string): Promise<boolean> {
+      const generation = restoreGeneration.current;
       try {
         await db.deletePhoto(id);
       } catch {
-        setError('Your photo was not removed.');
+        if (alive.current) setError('Your photo was not removed.');
         return false;
       }
+      if (generation !== restoreGeneration.current) return false;
+      if (!alive.current) return true;
       const old = photoUrls.current.get(id);
       photoUrls.current.delete(id);
       if (old) URL.revokeObjectURL(old);
@@ -179,6 +198,7 @@ export function useAppData() {
       try {
         const result = await restoreFromText(text);
         if (result.ok) {
+          restoreGeneration.current++;
           setData(result.data);
           replacePhotoUrls(result.photos);
         }

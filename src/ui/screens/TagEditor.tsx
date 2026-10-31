@@ -62,9 +62,10 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
     setPhotoBusy(true);
     try {
       const blob = await processPhoto(file, rasterizer);
-      if (!(await onSetPhoto(blob))) setPhotoError('Could not save the photo.');
+      // A storage failure is already reported by the app-wide message; only unreadable images are explained here.
+      await onSetPhoto(blob);
     } catch (err) {
-      setPhotoError(err instanceof PhotoError ? err.message : 'Could not save the photo.');
+      if (err instanceof PhotoError) setPhotoError(err.message);
     } finally {
       setPhotoBusy(false);
     }
@@ -75,7 +76,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
     setPhotoError(null);
     setPhotoBusy(true);
     try {
-      if (!(await onRemovePhoto())) setPhotoError('Could not remove the photo.');
+      await onRemovePhoto();
     } finally {
       setPhotoBusy(false);
     }

@@ -4,7 +4,9 @@ import * as dbModule from '../storage/db';
 import { loadAll, setOwned } from '../storage/db';
 import { makeLogEntry } from '../test/factories';
 import { freshDb } from '../test/freshDb';
+import { openDB } from 'idb';
 import { WithStore } from './testHarness';
+import { useAppData } from './useAppData';
 
 beforeEach(freshDb);
 afterEach(() => vi.restoreAllMocks());
@@ -345,4 +347,154 @@ describe('photos', () => {
     await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(created[1]));
     expect(revoked).toContain(created[0]);
   });
+
+  const backupText = (photos: Record<string, string>) =>
+    JSON.stringify({ app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [], photos });
+  const png = `data:image/png;base64,${btoa('hello')}`;
+
+  it('does not apply or keep a photo whose save finishes after a restore', async () => {
+    const user = userEvent.setup();
+    let finish!: () => void;
+    vi.spyOn(dbModule, 'putPhoto').mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
+    const results: boolean[] = [];
+    render(
+      <WithStore>
+        {(store) => (
+          <>
+            <Probe store={store} />
+            <button type="button" onClick={async () => void results.push(await store.setPhoto('1-3-001', blob('late')))}>late</button>
+            <button type="button" onClick={() => store.restore(backupText({ '1-3-002': png }))}>restore</button>
+          </>
+        )}
+      </WithStore>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'late' }));
+    await user.click(screen.getByRole('button', { name: 'restore' }));
+    await waitFor(() => expect(created).toHaveLength(1)); // the restored photo
+    await act(async () => finish());
+    await waitFor(() => expect(results).toEqual([false]));
+    expect(screen.getByTestId('url')).toHaveTextContent('none');
+    expect(created).toHaveLength(1);
+  });
+
+  it('does not apply a photo removal that finishes after a restore', async () => {
+    const user = userEvent.setup();
+    await dbModule.putPhoto('1-3-002', blob('x'));
+    let finish!: () => void;
+    vi.spyOn(dbModule, 'deletePhoto').mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
+    const results: boolean[] = [];
+    function Urls({ store }: { store: import('./useAppData').AppStore }) {
+      return <p data-testid="ids">{[...store.photos.keys()].join(',') || 'none'}</p>;
+    }
+    render(
+      <WithStore>
+        {(store) => (
+          <>
+            <Urls store={store} />
+            <button type="button" onClick={async () => void results.push(await store.removePhoto('1-3-002'))}>rm</button>
+            <button type="button" onClick={() => store.restore(backupText({ '1-3-002': png }))}>restore</button>
+          </>
+        )}
+      </WithStore>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'rm' }));
+    await user.click(screen.getByRole('button', { name: 'restore' }));
+    await waitFor(() => expect(created).toHaveLength(2)); // loaded, then restored
+    await act(async () => finish());
+    await waitFor(() => expect(results).toEqual([false]));
+    expect(screen.getByTestId('ids')).toHaveTextContent('1-3-002');
+  });
+
+  it('creates no object URL for a photo saved after unmount', async () => {
+    let finish!: () => void;
+    vi.spyOn(dbModule, 'putPhoto').mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
+    let pending!: Promise<boolean>;
+    const { unmount } = render(
+      <WithStore>
+        {(store) => (
+          <button type="button" onClick={() => void (pending = store.setPhoto('1-3-001', blob('a')))}>set</button>
+        )}
+      </WithStore>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'set' }));
+    unmount();
+    finish();
+    await pending;
+    expect(created).toEqual([]);
+  });
+
+  it('revokes photos that finish loading after unmount', async () => {
+    await dbModule.putPhoto('1-3-001', blob('a'));
+    let release!: () => void;
+    const real = dbModule.getAllPhotos;
+    vi.spyOn(dbModule, 'getAllPhotos').mockImplementationOnce(async () => {
+      const photos = await real();
+      await new Promise<void>((r) => (release = r));
+      return photos;
+    });
+    const { unmount } = render(<WithStore>{(store) => <Probe store={store} />}</WithStore>);
+    await waitFor(() => expect(release).toBeDefined());
+    unmount();
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(created.filter((u) => !revoked.includes(u))).toEqual([]);
+  });
+
+  it('shows one error when removing a photo fails, and keeps the picture', async () => {
+    const user = userEvent.setup();
+    await dbModule.putPhoto('1-3-001', blob('a'));
+    vi.spyOn(dbModule, 'deletePhoto').mockRejectedValueOnce(new Error('x'));
+    render(<WithStore>{(store) => <Probe store={store} />}</WithStore>);
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^blob:t/));
+    await user.click(screen.getByRole('button', { name: 'remove' }));
+    expect(await screen.findByText('Your photo was not removed.')).toBeInTheDocument();
+    expect(screen.getByTestId('url')).toHaveTextContent(/^blob:t/);
+  });
+
+  it('keeps the old photos when a restore fails', async () => {
+    const user = userEvent.setup();
+    await dbModule.putPhoto('1-3-001', blob('a'));
+    vi.spyOn(dbModule, 'replaceAll').mockRejectedValueOnce(new Error('x'));
+    const outcome: unknown[] = [];
+    render(
+      <WithStore>
+        {(store) => (
+          <>
+            <Probe store={store} />
+            <button type="button" onClick={async () => void outcome.push(await store.restore(backupText({ '1-3-002': png })))}>restore</button>
+          </>
+        )}
+      </WithStore>,
+    );
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^blob:t/));
+    const before = screen.getByTestId('url').textContent;
+    await user.click(screen.getByRole('button', { name: 'restore' }));
+    await waitFor(() => expect(outcome).toHaveLength(1));
+    expect(outcome[0]).toMatchObject({ ok: false });
+    expect(screen.getByTestId('url')).toHaveTextContent(before!);
+    expect(revoked).not.toContain(before);
+  });
+});
+
+it('tells the player to close other tabs when the upgrade is blocked, and recovers afterwards', async () => {
+  const v1 = await openDB('mezastar-helper', 1, {
+    upgrade(db) {
+      db.createObjectStore('owned');
+      db.createObjectStore('corrections');
+      db.createObjectStore('notes');
+      db.createObjectStore('log', { keyPath: 'id' });
+    },
+  });
+  function Bare() {
+    const store = useAppData();
+    return (
+      <p>
+        {store.loaded ? 'loaded' : 'loading'} / {store.error ?? 'no error'}
+      </p>
+    );
+  }
+  render(<Bare />);
+  expect(await screen.findByText(/Close other Mezastar Helper tabs, then reopen the app\./)).toBeInTheDocument();
+  v1.close();
+  expect(await screen.findByText('loaded / no error')).toBeInTheDocument();
 });
