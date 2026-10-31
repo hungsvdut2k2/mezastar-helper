@@ -1,12 +1,16 @@
-import { useState } from 'react';
-import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection } from '../../data/types';
+import { useEffect, useRef, useState } from 'react';
+import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection, type TagStats } from '../../data/types';
 import { gradeLabel, typeLabel } from '../format';
 
 type Props = {
+  /** The tag as the player currently sees it (shipped data plus any earlier correction). */
   tag: Tag;
+  /** The tag as shipped; only differences from this are stored. */
+  shipped: Tag;
   hasCorrection: boolean;
-  onSave: (correction: TagCorrection) => void;
-  onReset: () => void;
+  /** Receives only the overrides, or null when nothing differs from the shipped tag. */
+  onSave: (correction: TagCorrection | null) => void | Promise<void>;
+  onReset: () => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -21,7 +25,7 @@ type Field = (typeof FIELDS)[number][0];
 
 const toText = (v: number | null) => (v === null ? '' : String(v));
 
-export function TagEditor({ tag, hasCorrection, onSave, onReset, onClose }: Props) {
+export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose }: Props) {
   const [grade, setGrade] = useState(tag.grade === null ? '' : String(tag.grade));
   const [type1, setType1] = useState<PokemonType>(tag.types[0]);
   const [type2, setType2] = useState<string>(tag.types[1] ?? '');
@@ -35,29 +39,52 @@ export function TagEditor({ tag, hasCorrection, onSave, onReset, onClose }: Prop
   const [moveName, setMoveName] = useState(tag.move?.name ?? '');
   const [moveType, setMoveType] = useState<PokemonType>(tag.move?.type ?? tag.types[0]);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
 
-  function save() {
+  useEffect(() => heading.current?.focus(), []);
+
+  async function save() {
     const parsed = {} as Record<Field, number | null>;
     for (const [field, label] of FIELDS) {
       const text = numbers[field].trim();
       if (text === '') {
-        parsed[field] = null;
+        parsed[field] = null; // blank = no override
         continue;
       }
       const n = Number(text);
-      if (!Number.isFinite(n) || n < 0) {
-        setError(`${label} must be a number.`);
+      if (!Number.isInteger(n) || n < 0) {
+        setError(`${label} must be a whole number, 0 or more.`);
         return;
       }
       parsed[field] = n;
     }
-    onSave({
-      grade: grade === '' ? null : (Number(grade) as Grade),
-      types: type2 && type2 !== type1 ? [type1, type2 as PokemonType] : [type1],
-      pokenergy: parsed.pokenergy,
-      stats: { hp: parsed.hp, attack: parsed.attack, defense: parsed.defense, speed: parsed.speed },
-      move: moveName.trim() ? { name: moveName.trim(), type: moveType } : null,
-    });
+    setError(null);
+
+    const correction: TagCorrection = {};
+    const newGrade = grade === '' ? null : (Number(grade) as Grade);
+    if (newGrade !== shipped.grade) correction.grade = newGrade;
+    const newTypes = type2 && type2 !== type1 ? [type1, type2 as PokemonType] : [type1];
+    if (newTypes.join() !== shipped.types.join()) correction.types = newTypes;
+    if (parsed.pokenergy !== null && parsed.pokenergy !== shipped.pokenergy) correction.pokenergy = parsed.pokenergy;
+    const stats: Partial<TagStats> = {};
+    for (const key of ['hp', 'attack', 'defense', 'speed'] as const) {
+      if (parsed[key] !== null && parsed[key] !== shipped.stats[key]) stats[key] = parsed[key];
+    }
+    if (Object.keys(stats).length > 0) correction.stats = stats;
+    const newMove = moveName.trim() ? { name: moveName.trim(), type: moveType } : null;
+    const sameMove =
+      newMove === null || shipped.move === null
+        ? newMove === shipped.move
+        : newMove.name === shipped.move.name && newMove.type === shipped.move.type;
+    if (!sameMove) correction.move = newMove;
+
+    setSaving(true);
+    try {
+      await onSave(Object.keys(correction).length > 0 ? correction : null);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -65,7 +92,7 @@ export function TagEditor({ tag, hasCorrection, onSave, onReset, onClose }: Prop
       <button type="button" className="link" onClick={onClose}>
         ‹ Back
       </button>
-      <h1>
+      <h1 ref={heading} tabIndex={-1}>
         {tag.name} <small>{tag.id}</small>
       </h1>
       <p>
@@ -112,6 +139,8 @@ export function TagEditor({ tag, hasCorrection, onSave, onReset, onClose }: Prop
           <input
             type="number"
             inputMode="numeric"
+            min={0}
+            step={1}
             value={numbers[field]}
             onChange={(e) => setNumbers({ ...numbers, [field]: e.target.value })}
           />
@@ -132,9 +161,11 @@ export function TagEditor({ tag, hasCorrection, onSave, onReset, onClose }: Prop
         </select>
       </label>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">
+          {error}
+        </p>}
       <div className="actions">
-        <button type="button" className="primary" onClick={save}>
+        <button type="button" className="primary" disabled={saving} onClick={save}>
           Save
         </button>
         {hasCorrection && (

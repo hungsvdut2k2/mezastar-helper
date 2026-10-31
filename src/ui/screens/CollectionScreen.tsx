@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { TAGS } from '../../data/tags';
 import type { Tag } from '../../data/types';
 import { gradeLabel, searchTags, typeLabel } from '../format';
 import type { AppStore } from '../useAppData';
@@ -15,15 +16,29 @@ export function CollectionScreen({ store }: { store: AppStore }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [returnFocusId, setReturnFocusId] = useState<string | null>(null);
   const owned = new Set(store.data.owned);
   const editing = store.tags.find((t) => t.id === editingId);
 
+  // Back on the list, put focus on the row that was being edited.
+  useEffect(() => {
+    if (!editingId && returnFocusId) {
+      document.querySelector<HTMLElement>(`[data-row-id="${returnFocusId}"]`)?.focus();
+      setReturnFocusId(null);
+    }
+  }, [editingId, returnFocusId]);
+
   if (editing) {
-    const close = () => setEditingId(null);
+    const close = () => {
+      setReturnFocusId(editing.id);
+      setEditingId(null);
+    };
+    const shipped = TAGS.find((t) => t.id === editing.id) ?? editing;
     return (
       <TagEditor
         key={editing.id}
         tag={editing}
+        shipped={shipped}
         hasCorrection={editing.id in store.data.corrections}
         onSave={async (c) => {
           await store.saveCorrection(editing.id, c);
@@ -47,11 +62,12 @@ export function CollectionScreen({ store }: { store: AppStore }) {
       <p className="count">{`Owned ${owned.size} / ${store.tags.length}`}</p>
       <input
         type="search"
+        aria-label="Search tags"
         placeholder="Search name or number"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <div className="segmented">
+      <div className="segmented" role="group" aria-label="Show tags">
         {FILTERS.map((f) => (
           <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
             {f.label}
@@ -66,12 +82,13 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               <button
                 type="button"
                 className={isOwned ? 'own on' : 'own'}
-                aria-label={`${isOwned ? 'Owned' : 'Not owned'}: ${t.name} ${t.id}`}
+                aria-label={`Owned: ${t.name} ${t.id}`}
+                aria-pressed={isOwned}
                 onClick={() => store.toggleOwned(t.id)}
               >
                 {isOwned ? '✓' : ''}
               </button>
-              <button type="button" className="tag-row" onClick={() => setEditingId(t.id)}>
+              <button type="button" className="tag-row" data-row-id={t.id} onClick={() => setEditingId(t.id)}>
                 <strong>{t.name}</strong> <small>{`${t.id} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
               </button>
             </li>
