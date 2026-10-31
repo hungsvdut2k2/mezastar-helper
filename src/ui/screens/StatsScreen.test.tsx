@@ -99,6 +99,38 @@ describe('restore', () => {
     expect((await loadAll()).log.map((e) => e.id)).toEqual(['a']);
   });
 
+  it('says how many tag photos the restore replaces', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['a']), '1-3-002': new Blob(['b']) });
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
+    const backup = makeBackup(
+      { owned: [], corrections: {}, notes: {}, log: [] },
+      new Date(2026, 8, 5, 12),
+      { '1-3-003': `data:image/png;base64,${btoa('hello')}` },
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), new File([JSON.stringify(backup)], 'b.json', { type: 'application/json' }));
+    const group = await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(group).toHaveTextContent("It will replace your 2 tag photos with the backup's 1.");
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('warns loudly when the backup has no photos but the player has some', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['a']), '1-3-002': new Blob(['b']) });
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), backupFile());
+    const group = await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(group).toHaveTextContent("with the backup's 0.");
+    expect(screen.getByRole('alert')).toHaveTextContent('This backup has no photos — all 2 of your tag photos will be deleted.');
+  });
+
+  it('does not warn when there are no photos to lose', async () => {
+    await pickBackup();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('leaves the data unchanged on Cancel', async () => {
     const user = await pickBackup();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -178,6 +210,17 @@ describe('backup', () => {
     await screen.findByRole('status');
     const text = await share.mock.calls[0][0].files![0].text();
     expect(JSON.parse(text).photos).toEqual({ '1-3-001': `data:image/png;base64,${btoa('hello')}` });
+  });
+
+  it('stops with an error, and saves nothing, when the photos cannot be read for the backup', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValueOnce({}).mockRejectedValue(new Error('x'));
+    const share = vi.fn(async (_d: ShareData) => {});
+    stubNavigator(share);
+    const user = userEvent.setup();
+    renderScreen();
+    await user.click(await screen.findByRole('button', { name: 'Save backup' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the backup: the tag photos could not be read.');
+    expect(share).not.toHaveBeenCalled();
   });
 
   it('treats closing the share sheet as a cancel, not an error', async () => {
