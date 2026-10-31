@@ -59,3 +59,33 @@ describe('computeStats', () => {
     expect(empty.predictions.rate).toBeNull();
   });
 });
+
+describe('computeStats with Catch now plays', () => {
+  const battleWin = makeLogEntry({ id: 'w', caught: '1-3-001', bossDefeated: true, cronyDefeatedCount: 1 });
+  const battleLoss = makeLogEntry({ id: 'l', caught: null, bossDefeated: false, cronyDefeatedCount: 0 });
+  const catchNow = makeLogEntry({ id: 'n', mode: 'catchNow', caught: '1-3-001', bossDefeated: false, cronyDefeatedCount: 0 });
+  const s = computeStats([battleWin, battleLoss, catchNow], TAGS);
+
+  it('keeps Catch now plays out of the battle comparisons', () => {
+    expect(s.whenLost).toEqual({ count: 1, caught: 0, rate: 0 });
+    expect(s.noCronyDefeated).toEqual({ count: 1, caught: 0, rate: 0 });
+    expect(s.byTargetGrade).toEqual([{ grade: '6★', rate: { count: 2, caught: 1, rate: 0.5 } }]);
+  });
+
+  it('still counts them overall and reports them on their own', () => {
+    expect(s.plays).toBe(3);
+    expect(s.targetCatch).toEqual({ count: 3, caught: 2, rate: 2 / 3 });
+    expect(s.catchNow).toEqual({ count: 1, caught: 1, rate: 1 });
+  });
+});
+
+describe('prediction accuracy', () => {
+  it('counts defeating a different opponent as "not defeated"', () => {
+    const turn = { attacker: '1-3-002', aimedAt: '1-3-017', defeated: '1-3-041' };
+    const log = [
+      makeLogEntry({ id: 'x', turns: [{ ...turn, predictedDefeat: true }] }),
+      makeLogEntry({ id: 'y', turns: [{ ...turn, predictedDefeat: false }] }),
+    ];
+    expect(computeStats(log, TAGS).predictions).toEqual({ checked: 2, correct: 1, rate: 0.5 });
+  });
+});

@@ -9,6 +9,8 @@ export type PlayStats = {
   targetCatch: Rate;
   whenWon: Rate;
   whenLost: Rate;
+  /** Plays in "Catch now!" mode. They are left out of the battle comparisons. */
+  catchNow: Rate;
   byTargetGrade: { grade: string; rate: Rate }[];
   superstarsSeen: number;
   superstarsCaught: number;
@@ -29,8 +31,12 @@ function rate(entries: PlayLogEntry[]): Rate {
 export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
   const gradeOf = (id: string | null): Grade | null => tags.find((t) => t.id === id)?.grade ?? null;
 
+  // Battle comparisons (won/lost, crony defeated or not, target grade) skip "Catch now!"
+  // plays: there is no battle, so they would all count as lost with no crony defeated.
+  const battles = log.filter((e) => e.mode !== 'catchNow');
+
   const byGrade = new Map<string, PlayLogEntry[]>();
-  for (const e of log) {
+  for (const e of battles) {
     const g = gradeOf(e.target);
     const key = g === null ? 'Unknown' : `${g}★`;
     byGrade.set(key, [...(byGrade.get(key) ?? []), e]);
@@ -55,13 +61,14 @@ export function computeStats(log: PlayLogEntry[], tags: Tag[]): PlayStats {
     wins: log.filter((e) => e.bossDefeated).length,
     catches: log.filter((e) => e.caught !== null).length,
     targetCatch: rate(log),
-    whenWon: rate(log.filter((e) => e.bossDefeated)),
-    whenLost: rate(log.filter((e) => !e.bossDefeated)),
+    whenWon: rate(battles.filter((e) => e.bossDefeated)),
+    whenLost: rate(battles.filter((e) => !e.bossDefeated)),
+    catchNow: rate(log.filter((e) => e.mode === 'catchNow')),
     byTargetGrade: GRADE_ORDER.filter((g) => byGrade.has(g)).map((grade) => ({ grade, rate: rate(byGrade.get(grade)!) })),
     superstarsSeen: log.filter((e) => e.superstarAppeared).length,
     superstarsCaught: log.filter((e) => gradeOf(e.caught) === 6).length,
-    cronyDefeated: rate(log.filter((e) => e.cronyDefeatedCount > 0)),
-    noCronyDefeated: rate(log.filter((e) => e.cronyDefeatedCount === 0)),
+    cronyDefeated: rate(battles.filter((e) => e.cronyDefeatedCount > 0)),
+    noCronyDefeated: rate(battles.filter((e) => e.cronyDefeatedCount === 0)),
     byLocation: [...locations].map(([location, v]) => ({ location, ...v })),
     predictions: { checked: checked.length, correct, rate: checked.length ? correct / checked.length : null },
   };
