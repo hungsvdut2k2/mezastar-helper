@@ -1,6 +1,6 @@
 import { freshDb } from '../test/freshDb';
 import { makeLogEntry } from '../test/factories';
-import { makeBackup, parseBackup, restoreFromText } from './backup';
+import { blobToDataUrl, dataUrlToBlob, MAX_PHOTO_BYTES, makeBackup, parseBackup, restoreFromText } from './backup';
 import { addLogEntry, loadAll, saveCorrection, saveNote, setOwned } from './db';
 
 beforeEach(freshDb);
@@ -118,6 +118,59 @@ describe('backup', () => {
       const result = parseBackup(wrap({ notes }));
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error).toContain('notes');
+    });
+  });
+
+  describe('photos', () => {
+    const base = { app: 'mezastar-helper', version: 1, owned: [], corrections: {}, notes: {}, log: [] };
+    const png = `data:image/png;base64,${btoa('hello')}`;
+    const withPhotos = (photos: unknown) => JSON.stringify({ ...base, photos });
+
+    it('accepts valid photos for known tags', () => {
+      const result = parseBackup(withPhotos({ '1-3-001': png, '1-3-002': `data:image/jpeg;base64,${btoa('x')}` }));
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(Object.keys(result.photos)).toEqual(['1-3-001', '1-3-002']);
+        expect(result.photos['1-3-001'].type).toBe('image/png');
+        expect(result.photos['1-3-001'].size).toBe(5);
+      }
+    });
+
+    it('restores old backups that have no photos field', () => {
+      const result = parseBackup(JSON.stringify(base));
+      expect(result).toMatchObject({ ok: true, photos: {} });
+    });
+
+    it.each([
+      ['a wrong prefix', { '1-3-001': `data:text/html;base64,${btoa('x')}` }],
+      ['an svg image', { '1-3-001': `data:image/svg+xml;base64,${btoa('x')}` }],
+      ['not base64', { '1-3-001': 'data:image/png;base64,@@@@' }],
+      ['not a string', { '1-3-001': 5 }],
+      ['an unknown tag id', { 'nope-123': png }],
+      ['a non-object photos field', [png]],
+    ])('rejects %s', (_name, photos) => {
+      const result = parseBackup(withPhotos(photos));
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('photos');
+    });
+
+    it('rejects a photo over 2 MB but accepts exactly 2 MB', () => {
+      const at = `data:image/webp;base64,${btoa('a'.repeat(MAX_PHOTO_BYTES))}`;
+      const over = `data:image/webp;base64,${btoa('a'.repeat(MAX_PHOTO_BYTES + 1))}`;
+      expect(parseBackup(withPhotos({ '1-3-001': at })).ok).toBe(true);
+      expect(parseBackup(withPhotos({ '1-3-001': over })).ok).toBe(false);
+    });
+
+    it('omits the photos field when there are none, and includes it otherwise', () => {
+      const empty = { owned: [], corrections: {}, notes: {}, log: [] };
+      expect(makeBackup(empty)).not.toHaveProperty('photos');
+      expect(makeBackup(empty, new Date(), { '1-3-001': png }).photos).toEqual({ '1-3-001': png });
+    });
+
+    it('converts blobs to data URLs and back', async () => {
+      const url = await blobToDataUrl(new Blob(['hello'], { type: 'image/png' }));
+      expect(url).toBe(png);
+      expect(dataUrlToBlob(url)?.size).toBe(5);
     });
   });
 });

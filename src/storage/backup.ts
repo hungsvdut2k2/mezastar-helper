@@ -1,13 +1,57 @@
 import { POKEMON_TYPES, type PlayLogEntry, type PokemonType, type TagCorrection } from '../data/types';
+import { TAGS } from '../data/tags';
 import { replaceAll, type AppData } from './db';
 
 export const BACKUP_VERSION = 1;
 
-export type Backup = AppData & { app: 'mezastar-helper'; version: number; exportedAt: string };
-export type ParseResult = { ok: true; data: AppData } | { ok: false; error: string };
+export type Backup = AppData & {
+  app: 'mezastar-helper';
+  version: number;
+  exportedAt: string;
+  /** Tag photos as data URLs; absent in backups made before photos existed. */
+  photos?: Record<string, string>;
+};
+export type ParseResult =
+  | { ok: true; data: AppData; photos: Record<string, Blob> }
+  | { ok: false; error: string };
 
-export function makeBackup(data: AppData, now = new Date()): Backup {
-  return { app: 'mezastar-helper', version: BACKUP_VERSION, exportedAt: now.toISOString(), ...data };
+export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const PHOTO_PREFIX = /^data:image\/(jpeg|png|webp);base64,/;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+export function makeBackup(data: AppData, now = new Date(), photos: Record<string, string> = {}): Backup {
+  const backup: Backup = { app: 'mezastar-helper', version: BACKUP_VERSION, exportedAt: now.toISOString(), ...data };
+  if (Object.keys(photos).length > 0) backup.photos = photos;
+  return backup;
+}
+
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Decoded byte size of a base64 payload (assumes valid base64). */
+const base64Bytes = (b64: string) => Math.floor((b64.length * 3) / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+
+/** Returns null unless the string is an allowed image data URL within the size limit. */
+export function dataUrlToBlob(url: unknown): Blob | null {
+  if (!isString(url)) return null;
+  const m = PHOTO_PREFIX.exec(url);
+  if (!m) return null;
+  const b64 = url.slice(m[0].length);
+  if (b64.length % 4 !== 0 || !BASE64.test(b64) || base64Bytes(b64) > MAX_PHOTO_BYTES) return null;
+  try {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: `image/${m[1]}` });
+  } catch {
+    return null;
+  }
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -94,8 +138,19 @@ export function parseBackup(text: string): ParseResult {
   if (!Array.isArray(log) || !log.every(isLogEntry) || new Set(log.map((e) => e.id)).size !== log.length) {
     return damaged('play log');
   }
+  const photos: Record<string, Blob> = {};
+  if (raw.photos !== undefined) {
+    if (!isObject(raw.photos)) return damaged('photos');
+    const known = new Set(TAGS.map((t) => t.id));
+    for (const [id, url] of Object.entries(raw.photos)) {
+      const blob = known.has(id) ? dataUrlToBlob(url) : null;
+      if (!blob) return damaged('photos');
+      photos[id] = blob;
+    }
+  }
   return {
     ok: true,
+    photos,
     data: {
       owned,
       corrections: corrections as Record<string, TagCorrection>,
@@ -108,6 +163,6 @@ export function parseBackup(text: string): ParseResult {
 /** Validate first; only a valid file replaces the data on the phone. */
 export async function restoreFromText(text: string): Promise<ParseResult> {
   const result = parseBackup(text);
-  if (result.ok) await replaceAll(result.data);
+  if (result.ok) await replaceAll(result.data, result.photos);
   return result;
 }
