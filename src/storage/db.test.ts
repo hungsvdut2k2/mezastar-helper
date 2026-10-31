@@ -1,7 +1,8 @@
 import type { PlayLogEntry } from '../data/types';
 import { freshDb } from '../test/freshDb';
 import { makeLogEntry } from '../test/factories';
-import { addLogEntry, deleteLogEntry, loadAll, replaceAll, saveCorrection, saveNote, setOwned } from './db';
+import { openDB } from 'idb';
+import { addLogEntry, deleteLogEntry, deletePhoto, getAllPhotos, putPhoto, loadAll, replaceAll, saveCorrection, saveNote, setOwned } from './db';
 
 beforeEach(freshDb);
 
@@ -54,5 +55,44 @@ describe('storage', () => {
     };
     await expect(replaceAll(broken)).rejects.toThrow();
     expect(await loadAll()).toEqual(before);
+  });
+
+  it('stores, lists and deletes photos', async () => {
+    await putPhoto('1-3-001', new Blob(['abc'], { type: 'image/jpeg' }));
+    const photos = await getAllPhotos();
+    expect(Object.keys(photos)).toEqual(['1-3-001']);
+    // fake-indexeddb cannot clone jsdom Blobs faithfully, so only the key is checked here.
+    await deletePhoto('1-3-001');
+    expect(await getAllPhotos()).toEqual({});
+  });
+
+  it('replaceAll replaces photos too, and a failure keeps the old photos', async () => {
+    await putPhoto('old', new Blob(['1']));
+    const empty = { owned: [], corrections: {}, notes: {}, log: [] };
+    await replaceAll(empty, { fresh: new Blob(['22']) });
+    expect(Object.keys(await getAllPhotos())).toEqual(['fresh']);
+    const broken = { ...empty, log: [{ id: undefined } as unknown as PlayLogEntry] };
+    await expect(replaceAll(broken, {})).rejects.toThrow();
+    expect(Object.keys(await getAllPhotos())).toEqual(['fresh']);
+  });
+
+  it('upgrades a version 1 database without losing data', async () => {
+    const v1 = await openDB('mezastar-helper', 1, {
+      upgrade(db) {
+        db.createObjectStore('owned');
+        db.createObjectStore('corrections');
+        db.createObjectStore('notes');
+        db.createObjectStore('log', { keyPath: 'id' });
+      },
+    });
+    await v1.put('owned', true, '1-3-001');
+    await v1.put('notes', 'keep me', 'lanes');
+    await v1.put('log', makeLogEntry({ id: 'a' }));
+    v1.close();
+    const data = await loadAll();
+    expect(data.owned).toEqual(['1-3-001']);
+    expect(data.notes).toEqual({ lanes: 'keep me' });
+    expect(data.log.map((e) => e.id)).toEqual(['a']);
+    expect(await getAllPhotos()).toEqual({});
   });
 });

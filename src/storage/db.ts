@@ -13,6 +13,7 @@ interface HelperDB extends DBSchema {
   corrections: { key: string; value: TagCorrection };
   notes: { key: string; value: string };
   log: { key: string; value: PlayLogEntry };
+  photos: { key: string; value: Blob };
 }
 
 const DB_NAME = 'mezastar-helper';
@@ -20,13 +21,16 @@ let dbPromise: Promise<IDBPDatabase<HelperDB>> | null = null;
 
 function getDb() {
   if (!dbPromise) {
-    const opening = openDB<HelperDB>(DB_NAME, 1, {
+    const opening = openDB<HelperDB>(DB_NAME, 2, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('owned');
           db.createObjectStore('corrections');
           db.createObjectStore('notes');
           db.createObjectStore('log', { keyPath: 'id' });
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('photos');
         }
       },
       // Another tab wants to upgrade or delete the database: let go so it can.
@@ -75,6 +79,23 @@ export async function loadAll(): Promise<AppData> {
   };
 }
 
+/** Tag photos by tag id. Kept out of AppData: they are binary and loaded/backed up separately. */
+export async function getAllPhotos(): Promise<Record<string, Blob>> {
+  const db = await getDb();
+  const [ids, blobs] = await Promise.all([db.getAllKeys('photos'), db.getAll('photos')]);
+  return zip(ids, blobs);
+}
+
+export async function putPhoto(id: string, blob: Blob) {
+  const db = await getDb();
+  await db.put('photos', blob, id);
+}
+
+export async function deletePhoto(id: string) {
+  const db = await getDb();
+  await db.delete('photos', id);
+}
+
 export async function setOwned(tagId: string, owned: boolean) {
   const db = await getDb();
   if (owned) await db.put('owned', true, tagId);
@@ -103,21 +124,23 @@ export async function deleteLogEntry(id: string) {
 }
 
 /** Replace all data in one transaction: either everything is written or nothing changes. */
-export async function replaceAll(data: AppData) {
+export async function replaceAll(data: AppData, photos: Record<string, Blob> = {}) {
   const db = await getDb();
-  const tx = db.transaction(['owned', 'corrections', 'notes', 'log'], 'readwrite');
+  const tx = db.transaction(['owned', 'corrections', 'notes', 'log', 'photos'], 'readwrite');
   const owned = tx.objectStore('owned');
   const corrections = tx.objectStore('corrections');
   const notes = tx.objectStore('notes');
   const log = tx.objectStore('log');
+  const photoStore = tx.objectStore('photos');
   const pending: Promise<unknown>[] = [tx.done];
   try {
     // Requests run in order inside the transaction, so clear-then-put needs no waiting in between.
-    pending.push(owned.clear(), corrections.clear(), notes.clear(), log.clear());
+    pending.push(owned.clear(), corrections.clear(), notes.clear(), log.clear(), photoStore.clear());
     for (const id of data.owned) pending.push(owned.put(true, id));
     for (const [id, c] of Object.entries(data.corrections)) pending.push(corrections.put(c, id));
     for (const [id, text] of Object.entries(data.notes)) pending.push(notes.put(text, id));
     for (const entry of data.log) pending.push(log.put(entry));
+    for (const [id, blob] of Object.entries(photos)) pending.push(photoStore.put(blob, id));
     await Promise.all(pending);
   } catch (err) {
     // A synchronous failure would otherwise let the transaction commit the clears.
