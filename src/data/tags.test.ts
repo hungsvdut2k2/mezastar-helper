@@ -1,4 +1,5 @@
 import { TAGS } from './tags';
+import { CUSTOM_ID_PATTERN, newCustomId } from './customTag';
 import { SETS, printedCode, setOfTag, setOfTagId } from './setInfo';
 import { GIMMICKS, POKEMON_TYPES } from './types';
 
@@ -99,5 +100,18 @@ describe('Stardust V3 tags', () => {
       expect(Object.values(t.stats).every((v) => v === null)).toBe(true);
       expect(t.pokenergy).toBeNull();
     }
+  });
+});
+
+describe('player-added tags', () => {
+  it('puts ids with the my- prefix in a My tags pseudo-set that is not in SETS', () => {
+    expect(setOfTagId('my-123')?.name).toBe('My tags');
+    expect(SETS.some((x) => x.id === 'my-tags')).toBe(false);
+  });
+
+  it('can never collide with a shipped id', () => {
+    expect(TAGS.some((t) => t.id.startsWith('my-'))).toBe(false);
+    expect(newCustomId()).toMatch(CUSTOM_ID_PATTERN);
+    expect(newCustomId()).not.toBe(newCustomId());
   });
 });

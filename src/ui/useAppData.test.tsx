@@ -567,3 +567,24 @@ it('tells the player to close other tabs when the upgrade is blocked, and recove
   v1.close();
   expect(await screen.findByText('loaded / no error')).toBeInTheDocument();
 });
+
+it('restoring a backup brings back custom tags, merged into store.tags', async () => {
+  const user = userEvent.setup();
+  const tag = makeTag('my-r1', { name: 'Restored', printedCode: 'Z-1' });
+  const text = JSON.stringify({
+    app: 'mezastar-helper', version: 1, owned: ['my-r1'], corrections: {}, notes: {}, log: [], customTags: [tag],
+  });
+  render(
+    <WithStore>
+      {(store) => (
+        <>
+          <p>{store.tags.find((t) => t.id === 'my-r1')?.name ?? 'none'}</p>
+          <button type="button" onClick={() => store.restore(text)}>restore</button>
+        </>
+      )}
+    </WithStore>,
+  );
+  await user.click(await screen.findByRole('button', { name: 'restore' }));
+  expect(await screen.findByText('Restored')).toBeInTheDocument();
+  expect((await loadAll()).customTags.map((t) => t.id)).toEqual(['my-r1']);
+});
