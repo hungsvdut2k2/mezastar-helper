@@ -5,6 +5,8 @@ import { gradeLabel, searchTags } from '../format';
 
 type Props = { label: string; tags: Tag[]; value: Tag | null; onChange: (tag: Tag | null) => void };
 
+const MAX_RESULTS = 8;
+
 /** Code, grade and set, so the same Pokémon in different sets can be told apart. */
 const tagLabel = (t: Tag) => [printedCode(t), gradeLabel(t.grade), setLabel(t)].filter(Boolean).join(' ');
 
@@ -42,7 +44,8 @@ export function TagPicker({ label, tags, value, onChange }: Props) {
   }
 
   const searching = query.trim() !== '';
-  const matches = searching ? searchTags(tags, query).slice(0, 8) : [];
+  const found = searching ? searchTags(tags, query) : [];
+  const matches = found.slice(0, MAX_RESULTS);
   return (
     <div className="picker">
       <label className="picker-label">
@@ -60,7 +63,13 @@ export function TagPicker({ label, tags, value, onChange }: Props) {
       </label>
       {/* Only this short message is announced, never the whole button list. */}
       <p className="hint picker-status" aria-live="polite">
-        {searching ? (matches.length === 0 ? 'No matching tag' : `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`) : ''}
+        {!searching
+          ? ''
+          : found.length === 0
+            ? 'No matching tag'
+            : found.length > MAX_RESULTS
+              ? `Showing ${MAX_RESULTS} of ${found.length} — type a code to narrow`
+              : `${found.length} ${found.length === 1 ? 'match' : 'matches'}`}
       </p>
       <div className="picker-results">
         {matches.map((t) => (

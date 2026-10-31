@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TAGS } from '../../data/tags';
 import type { Tag } from '../../data/types';
+import { searchTags } from '../format';
 import { TagPicker } from './TagPicker';
 
 function Harness() {
@@ -55,4 +56,17 @@ it('moves focus to the chosen tag, and back to the input after clearing', async 
   expect(screen.getByRole('button', { name: 'Clear Boss' })).toHaveFocus();
   await user.click(screen.getByRole('button', { name: 'Clear Boss' }));
   expect(screen.getByLabelText('Boss')).toHaveFocus();
+});
+
+it('says how many matches are hidden when results are truncated', async () => {
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.type(screen.getByLabelText('Boss'), '1-3-0');
+  const total = searchTags(TAGS, '1-3-0').length;
+  expect(total).toBeGreaterThan(8);
+  expect(screen.getByText(`Showing 8 of ${total} — type a code to narrow`)).toBeInTheDocument();
+  expect(screen.getAllByRole('button')).toHaveLength(8);
+  await user.type(screen.getByLabelText('Boss'), '01');
+  expect(screen.getByLabelText('Boss')).toHaveValue('1-3-001');
+  expect(screen.getByText('1 match')).toBeInTheDocument();
 });
