@@ -13,22 +13,38 @@ export function fitWithin(width: number, height: number, max = PHOTO_MAX_SIDE): 
 /** Decodes an image and re-encodes it at the size `fit` picks. Replaceable in tests. */
 export type Rasterizer = (file: Blob, fit: typeof fitWithin) => Promise<Blob>;
 
-/** The browser implementation (canvas). Not available in jsdom. */
+/**
+ * The browser implementation (canvas). Not available in jsdom: this path is verified on a device, not in tests.
+ * Decoding goes through an <img> so iOS (13.4+) applies the EXIF orientation, and createImageBitmap is not required.
+ */
 export const canvasRasterizer: Rasterizer = async (file, fit) => {
-  const bitmap = await createImageBitmap(file);
+  const url = URL.createObjectURL(file);
+  let canvas: HTMLCanvasElement | null = null;
   try {
-    const { width, height } = fit(bitmap.width, bitmap.height);
-    const canvas = document.createElement('canvas');
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const { width, height } = fit(img.naturalWidth, img.naturalHeight);
+    canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('no canvas');
-    ctx.drawImage(bitmap, 0, 0, width, height);
+    // JPEG has no transparency: transparent pixels would turn black.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    const target = canvas;
     return await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', PHOTO_QUALITY),
+      target.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', PHOTO_QUALITY),
     );
   } finally {
-    bitmap.close();
+    URL.revokeObjectURL(url);
+    if (canvas) {
+      // Release the pixel memory right away (iOS Safari keeps canvases alive for a long time).
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 };
 
