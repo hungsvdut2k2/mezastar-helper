@@ -28,13 +28,27 @@ export function useAppData() {
 
   const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
 
-  /** Update the screen right away, then save; tell the player if saving failed. Resolves to true only if saved. */
-  async function write(update: (d: AppData) => AppData, persist: () => Promise<void>): Promise<boolean> {
+  // Newest write per key, so an old failure never undoes a newer attempt on the same item.
+  const newestWrite = useRef(new Map<string, number>());
+  const writeCounter = useRef(0);
+
+  /**
+   * Update the screen right away, then save; tell the player if saving failed. Resolves to true only if saved.
+   * With `rollback`, a failed save also takes the change back off the screen (unless a newer write for the same key exists).
+   */
+  async function write(
+    update: (d: AppData) => AppData,
+    persist: () => Promise<void>,
+    rollback?: { key: string; undo: (d: AppData) => AppData },
+  ): Promise<boolean> {
+    const mine = ++writeCounter.current;
+    if (rollback) newestWrite.current.set(rollback.key, mine);
     setData(update(latest.current));
     try {
       await persist();
       return true;
     } catch {
+      if (rollback && newestWrite.current.get(rollback.key) === mine) setData(rollback.undo(latest.current));
       setError('Your latest change was not saved.');
       return false;
     }
@@ -71,7 +85,12 @@ export function useAppData() {
       return write((d) => ({ ...d, notes: { ...d.notes, [id]: text } }), () => db.saveNote(id, text));
     },
     addLog(entry: PlayLogEntry) {
-      return write((d) => ({ ...d, log: [entry, ...d.log.filter((e) => e.id !== entry.id)] }), () => db.addLogEntry(entry));
+      return write(
+        (d) => ({ ...d, log: [entry, ...d.log.filter((e) => e.id !== entry.id)] }),
+        () => db.addLogEntry(entry),
+        // An unsaved play must not look saved in Stats; the form keeps its data and can retry.
+        { key: `log:${entry.id}`, undo: (d) => ({ ...d, log: d.log.filter((e) => e.id !== entry.id) }) },
+      );
     },
     deleteLog(id: string) {
       return write((d) => ({ ...d, log: d.log.filter((e) => e.id !== id) }), () => db.deleteLogEntry(id));

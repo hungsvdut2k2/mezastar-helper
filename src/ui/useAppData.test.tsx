@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as dbModule from '../storage/db';
 import { loadAll, setOwned } from '../storage/db';
+import { makeLogEntry } from '../test/factories';
 import { freshDb } from '../test/freshDb';
 import { WithStore } from './testHarness';
 
@@ -99,4 +100,63 @@ it('reports whether a write was saved', async () => {
   );
   await userEvent.setup().click(await screen.findByRole('button', { name: 'go' }));
   await vi.waitFor(() => expect(result.ok).toEqual([true, false]));
+});
+
+describe('addLog when saving fails', () => {
+  it('rolls the entry back, and a retry then leaves exactly one entry', async () => {
+    const user = userEvent.setup();
+    const e = makeLogEntry({ id: 'e1' });
+    vi.spyOn(dbModule, 'addLogEntry').mockRejectedValueOnce(new Error('disk full'));
+    render(
+      <WithStore>
+        {(store) => (
+          <>
+            <button type="button" onClick={() => store.addLog(e)}>
+              {`add: ${store.data.log.map((l) => l.id).join(',') || 'none'}`}
+            </button>
+            <p>{store.error ?? 'no error'}</p>
+          </>
+        )}
+      </WithStore>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'add: none' }));
+    expect(await screen.findByText('Your latest change was not saved.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'add: none' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'add: none' }));
+    expect(await screen.findByRole('button', { name: 'add: e1' })).toBeInTheDocument();
+    expect((await loadAll()).log.map((l) => l.id)).toEqual(['e1']);
+  });
+
+  it('does not duplicate the entry when a retry starts before the first save has failed', async () => {
+    const e = makeLogEntry({ id: 'e2' });
+    let failFirst!: () => void;
+    vi.spyOn(dbModule, 'addLogEntry')
+      .mockImplementationOnce(() => new Promise<void>((_, reject) => (failFirst = () => reject(new Error('x')))))
+      .mockResolvedValue();
+    const results: Promise<boolean>[] = [];
+    render(
+      <WithStore>
+        {(store) => (
+          <button
+            type="button"
+            onClick={() => {
+              results.push(store.addLog(e), store.addLog(e));
+            }}
+          >
+            {`log: ${store.data.log.map((l) => l.id).join(',') || 'none'}`}
+          </button>
+        )}
+      </WithStore>,
+    );
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'log: none' }));
+    expect(await screen.findByRole('button', { name: 'log: e2' })).toBeInTheDocument();
+    let outcomes: boolean[] = [];
+    await act(async () => {
+      failFirst();
+      outcomes = await Promise.all(results);
+    });
+    expect(outcomes).toEqual([false, true]);
+    // The old failure must not take away the newer, saved attempt.
+    expect(screen.getByRole('button', { name: 'log: e2' })).toBeInTheDocument();
+  });
 });
