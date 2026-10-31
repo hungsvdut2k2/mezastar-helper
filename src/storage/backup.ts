@@ -34,7 +34,7 @@ function isCorrection(v: unknown): v is TagCorrection {
     optional(pokenergy, (p) => p === null || isCount(p)) &&
     optional(
       stats,
-      (s) => isObject(s) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isCount(x))),
+      (s) => isObject(s) && Object.keys(s).every((k) => STAT_KEYS.includes(k)) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isCount(x))),
     ) &&
     optional(move, (m) => m === null || (isObject(m) && isString(m.name) && isType(m.type)))
   );

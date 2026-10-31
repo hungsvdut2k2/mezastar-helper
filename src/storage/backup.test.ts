@@ -74,6 +74,7 @@ describe('backup', () => {
       ['string pokenergy', { pokenergy: '5' }],
       ['stats not an object', { stats: 5 }],
       ['stat not a number', { stats: { attack: 'x' } }],
+      ['unknown stat key', { stats: { attack: 10, speeed: 5 } }],
       ['move without name', { move: { type: 'fire' } }],
       ['move unknown type', { move: { name: 'X', type: 'sparkle' } }],
       ['move not an object', { move: 'Tackle' }],
