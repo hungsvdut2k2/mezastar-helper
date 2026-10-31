@@ -11,7 +11,7 @@ The app cannot connect to or see the arcade machine. The player tells the app wh
 
 ## How a battle works (research summary)
 
-Trust levels: **confirmed** = official Mezastar Asia site; **community** = player blogs/videos; **open** = not found yet, to be checked by the player at the machine.
+Trust levels: **confirmed** = official Mezastar Asia site; **community** = player blogs/videos; **player** = observed by the player at the machine; **open** = not found yet, to be checked by the player.
 
 | Mechanic | Trust | Source |
 |---|---|---|
@@ -34,7 +34,7 @@ Trust levels: **confirmed** = official Mezastar Asia site; **community** = playe
 | Defeating the two weaker cronies quickly, then attacking the Superstar boss, improves the catch. | community | Japanese player blogs |
 | "Catch now!" mode rarely gives Superstars (one blogger: 0 of 25). | community | Japanese player blog |
 | Catching a Pokémon adds a bonus 4th/5th turn. | community (Japan only) | Bulbapedia |
-| Can the player choose **which** opponent to attack, or is it automatic? | open | — |
+| The player chooses **which** of the 3 opponents to attack each turn. | player | Confirmed by the player, 2026-10-31 |
 | How many tags (lanes) can be placed per battle? Assumed 3. | open | — |
 | Exact damage formula, Catch Gauge size, Ball Roulette odds. | open | — |
 
@@ -118,7 +118,7 @@ type Mechanic = {
   id: string;
   title: string;
   explanation: string;
-  trust: 'confirmed' | 'community' | 'open';
+  trust: 'confirmed' | 'community' | 'player' | 'open';
   sources: string[];
 };
 ```
@@ -158,7 +158,7 @@ So the engine searches every legal 3-turn sequence for the chosen team and picks
 - **Fallback**: if key stats are missing, the engine uses the default rule-of-thumb plan (turn 1 defeat a crony, turn 2 different tag, turn 3 strongest hit on target) and labels it "rule of thumb".
 - Reminders on every plan: scan a Support Ticket first if you have one; slide a tag forward to preview effectiveness; slide all tags forward if "Everyone Attack!" appears.
 
-Each step shows the trust level of the rule it relies on. Because "can I choose which opponent to attack?" is still open, the model has a switch: if the target is chosen automatically, the search only varies the attacking tag. The Guide asks the player to confirm.
+Each step shows the trust level of the rule it relies on. The player chooses which opponent to attack each turn (player-confirmed), so the search varies both the attacking tag and the opponent aimed at.
 
 **Calibration**: the play log records per-turn results when the player wants (attacker, aimed-at, defeated or not). Stats shows how often the model's "defeats in one hit" predictions were right, so the placeholder constants can be adjusted later (adjusting is out of scope for version 1; measuring is in scope).
 
