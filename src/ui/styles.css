@@ -16,6 +16,8 @@
 body { margin: 0; }
 .app { min-height: 100dvh; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 main { padding: 16px calc(16px + env(safe-area-inset-right)) 16px calc(16px + env(safe-area-inset-left)); padding-top: calc(16px + env(safe-area-inset-top)); max-width: 640px; margin: 0 auto; }
+/* the banner already clears the notch */
+.error.banner + main { padding-top: 16px; }
 h1 { font-size: 1.5rem; margin: 0 0 12px; scroll-margin-top: 96px; }
 h2 { font-size: 1.1rem; margin: 20px 0 8px; }
 button, input, select, textarea { font: inherit; }
