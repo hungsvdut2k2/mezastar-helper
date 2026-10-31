@@ -16,7 +16,7 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 const isString = (v: unknown): v is string => typeof v === 'string';
 
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
-const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
 const isType = (v: unknown): v is PokemonType => (POKEMON_TYPES as readonly unknown[]).includes(v);
 const isOneOf = (list: readonly string[]) => (v: unknown) => isString(v) && list.includes(v);
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
@@ -30,11 +30,11 @@ function isCorrection(v: unknown): v is TagCorrection {
   const { grade, types, pokenergy, stats, move } = v;
   return (
     optional(grade, (g) => g === null || (Number.isInteger(g) && (g as number) >= 2 && (g as number) <= 6)) &&
-    optional(types, (t) => Array.isArray(t) && t.length >= 1 && t.length <= 2 && t.every(isType)) &&
-    optional(pokenergy, (p) => p === null || (isNumber(p) && p >= 0)) &&
+    optional(types, (t) => Array.isArray(t) && t.length >= 1 && t.length <= 2 && t.every(isType) && new Set(t).size === t.length) &&
+    optional(pokenergy, (p) => p === null || isCount(p)) &&
     optional(
       stats,
-      (s) => isObject(s) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isNumber(x))),
+      (s) => isObject(s) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isCount(x))),
     ) &&
     optional(move, (m) => m === null || (isObject(m) && isString(m.name) && isType(m.type)))
   );
@@ -100,7 +100,7 @@ export function parseBackup(text: string): ParseResult {
       owned,
       corrections: corrections as Record<string, TagCorrection>,
       notes: notes as Record<string, string>,
-      log,
+      log: [...log].sort((a, b) => b.date.localeCompare(a.date)),
     },
   };
 }

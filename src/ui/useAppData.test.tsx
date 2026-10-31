@@ -6,6 +6,7 @@ import { freshDb } from '../test/freshDb';
 import { WithStore } from './testHarness';
 
 beforeEach(freshDb);
+afterEach(() => vi.restoreAllMocks());
 
 it('loads saved data and applies corrections to tags', async () => {
   await setOwned('1-3-001', true);
@@ -55,7 +56,6 @@ it('shows an error when saving fails, but keeps the change on screen', async () 
   await user.click(await screen.findByRole('button', { name: 'owned: 0' }));
   expect(await screen.findByText('Your latest change was not saved.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'owned: 1' })).toBeInTheDocument();
-  vi.restoreAllMocks();
 });
 
 it('never duplicates an id on fast double taps', async () => {

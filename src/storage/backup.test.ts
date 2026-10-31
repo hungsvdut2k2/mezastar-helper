@@ -67,6 +67,10 @@ describe('backup', () => {
       ['three types', { types: ['fire', 'water', 'grass'] }],
       ['unknown type', { types: ['sparkle'] }],
       ['negative pokenergy', { pokenergy: -1 }],
+      ['fractional pokenergy', { pokenergy: 1.5 }],
+      ['duplicate types', { types: ['fire', 'fire'] }],
+      ['fractional stat', { stats: { attack: 10.5 } }],
+      ['negative stat', { stats: { hp: -1 } }],
       ['string pokenergy', { pokenergy: '5' }],
       ['stats not an object', { stats: 5 }],
       ['stat not a number', { stats: { attack: 'x' } }],
@@ -93,6 +97,13 @@ describe('backup', () => {
       const result = parseBackup(wrap({ log: [{ ...goodEntry, ...bad }] }));
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error).toContain('play log');
+    });
+
+    it('sorts the restored log newest first', () => {
+      const old = makeLogEntry({ id: 'old', date: '2026-01-01T00:00:00.000Z' });
+      const recent = makeLogEntry({ id: 'new', date: '2026-06-01T00:00:00.000Z' });
+      const result = parseBackup(wrap({ log: [old, recent] }));
+      expect(result.ok && result.data.log.map((e) => e.id)).toEqual(['new', 'old']);
     });
 
     it('rejects duplicate log ids', () => {
