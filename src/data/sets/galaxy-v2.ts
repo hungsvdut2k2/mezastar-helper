@@ -7,8 +7,8 @@ import { makeTagBuilder } from './builder';
 const tag = makeTagBuilder(setById('galaxy-v2').url);
 
 export const GALAXY_V2: Tag[] = [
-  tag('2-2-001', 'Zacian', 6, ['fairy', 'steel'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Behemoth Blade + Moonblast', moveType: 'steel' } }),
-  tag('2-2-002', 'Zamazenta', 6, ['fighting', 'steel'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Behemoth Bash + Close Combat', moveType: 'steel' } }),
+  tag('2-2-001', 'Zacian', 6, ['fairy', 'steel'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Behemoth Blade + Moonblast', moveType: 'steel', moveTypes: ['steel', 'fairy'] } }),
+  tag('2-2-002', 'Zamazenta', 6, ['fighting', 'steel'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Behemoth Bash + Close Combat', moveType: 'steel', moveTypes: ['steel', 'fighting'] } }),
   tag('2-2-003', 'Duraludon', 6, ['steel', 'dragon'], { gimmick: { kind: 'gigantamax', moveName: 'G-Max Depletion', moveType: 'dragon' } }),
   tag('2-2-004', 'Charizard', 6, ['fire', 'flying'], { gimmick: { kind: 'gigantamax', moveName: 'G-Max Wildfire', moveType: 'fire' } }),
   tag('2-2-005', 'Zarude', 6, ['dark', 'grass'], { mythical: true, gimmick: { kind: 'dynamax', moveName: 'Max Overgrowth', moveType: 'grass' } }),

@@ -15,10 +15,10 @@ export const MODEL = {
   gimmickMultiplier: {
     mega: 1.5,
     dynamax: 1.5,
-    gigantamax: 1.5, // treated like Dynamax until measured
+    gigantamax: 1.5, // assumed equal to Dynamax (community assumption, see mechanics.ts)
     zmove: 1.8,
     tagMove: 1.8,
-    doubleMove: 1.8,
+    doubleMove: 1.8, // total for the two hits; each hit is worth half (community estimate)
     chainAttack: 1.3,
   } satisfies Record<Gimmick, number>,
   /**
@@ -33,6 +33,12 @@ export const MODEL = {
 
 /** Special moves the game limits to one use per battle ("per play" counts as per battle here). */
 export const LIMITED_GIMMICKS: ReadonlySet<Gimmick> = new Set<Gimmick>(['mega', 'dynamax', 'gigantamax', 'zmove']);
+
+/**
+ * The limit a special move counts against. Gigantamax is assumed to share Dynamax's
+ * once-per-battle limit, so a battle (or team) gets only one of the two.
+ */
+export const limitKey = (kind: Gimmick): Gimmick => (kind === 'gigantamax' ? 'dynamax' : kind);
 
 /** opponents[0] is the Boss; [1] and [2] are the cronies. */
 export type Battle = { opponents: [Tag, Tag, Tag]; targetIndex: 0 | 1 | 2 };
@@ -67,7 +73,11 @@ export function attackType(tag: Tag, useGimmick: boolean): PokemonType | null {
 
 export function damage(attacker: Tag, defender: Tag, useGimmick: boolean): number {
   const multiplier = useGimmick && attacker.gimmick ? MODEL.gimmickMultiplier[attacker.gimmick.kind] : 1;
-  const eff = effectiveness(attackType(attacker, useGimmick), defender.types);
+  // A Double Move is two hits, each worth half of the total, each with its own type effectiveness.
+  const double = useGimmick && attacker.gimmick?.kind === 'doubleMove' ? attacker.gimmick.moveTypes : undefined;
+  const eff = double
+    ? (effectiveness(double[0], defender.types) + effectiveness(double[1], defender.types)) / 2
+    : effectiveness(attackType(attacker, useGimmick), defender.types);
   const defenseFactor = 1 + statOrNeutral(defender.stats.defense) / MODEL.defenseScale;
   return (statOrNeutral(attacker.stats.attack) * eff * multiplier) / defenseFactor;
 }
@@ -87,7 +97,7 @@ export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult 
   const oppHp = battle.opponents.map((o) => statOrNeutral(o.stats.hp));
   const tagHp = team.map((t) => statOrNeutral(t.stats.hp));
   const hasAttacked = team.map(() => false);
-  const usedGimmicks = new Set<Gimmick>();
+  const usedLimits = new Set<Gimmick>();
   const outcomes: TurnOutcome[] = [];
   let supporters = 0;
   let newSupporters = 0;
@@ -106,13 +116,13 @@ export function simulate(team: Tag[], battle: Battle, turns: Turn[]): SimResult 
     const opp = battle.opponents[turn.aimAt];
     const kind = tag.gimmick?.kind;
     const canUseGimmick =
-      kind !== undefined && !hasAttacked[turn.tagIndex] && !(LIMITED_GIMMICKS.has(kind) && usedGimmicks.has(kind));
+      kind !== undefined && !hasAttacked[turn.tagIndex] && !(LIMITED_GIMMICKS.has(kind) && usedLimits.has(limitKey(kind)));
     let usedGimmick = false;
 
     const hit = () => {
       // The special move is only spent when the tag actually attacks.
       usedGimmick = canUseGimmick;
-      if (usedGimmick && kind) usedGimmicks.add(kind);
+      if (usedGimmick && kind) usedLimits.add(limitKey(kind));
       hasAttacked[turn.tagIndex] = true;
       const base = damage(tag, opp, usedGimmick) * (tired ? MODEL.tiredAttackMultiplier : 1);
       const dealt = Math.min(oppHp[turn.aimAt], base + supporters * MODEL.supporterBonus);

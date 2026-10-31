@@ -9,9 +9,9 @@ const tag = makeTagBuilder(setById('galaxy-v3').url);
 export const GALAXY_V3: Tag[] = [
   tag('2-3-001', 'Koraidon', 6, ['fighting', 'dragon'], { legendary: true, move: { name: 'Collision Course', type: 'fighting' } }),
   tag('2-3-002', 'Miraidon', 6, ['electric', 'dragon'], { legendary: true, move: { name: 'Electro Drift', type: 'electric' } }),
-  tag('2-3-003', 'Xerneas', 6, ['fairy'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Moonblast + Close Combat', moveType: 'fairy' } }),
-  tag('2-3-004', 'Yveltal', 6, ['dark', 'flying'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Dark Pulse + Oblivion Wing', moveType: 'dark' } }),
-  tag('2-3-005', 'Zygarde', 6, ['dragon', 'ground'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Core Enforcer + Land\'s Wrath', moveType: 'dragon' } }),
+  tag('2-3-003', 'Xerneas', 6, ['fairy'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Moonblast + Close Combat', moveType: 'fairy', moveTypes: ['fairy', 'fighting'] } }),
+  tag('2-3-004', 'Yveltal', 6, ['dark', 'flying'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Dark Pulse + Oblivion Wing', moveType: 'dark', moveTypes: ['dark', 'flying'] } }),
+  tag('2-3-005', 'Zygarde', 6, ['dragon', 'ground'], { legendary: true, gimmick: { kind: 'doubleMove', moveName: 'Core Enforcer + Land\'s Wrath', moveType: 'dragon', moveTypes: ['dragon', 'ground'] } }),
   tag('2-3-006', 'Regigigas', 6, ['normal'], { legendary: true }),
   tag('2-3-007', 'Lugia', 6, ['psychic', 'flying'], { legendary: true, gimmick: { kind: 'dynamax', moveName: 'Max Airstream', moveType: 'flying' } }),
   tag('2-3-008', 'Ho-Oh', 6, ['fire', 'flying'], { legendary: true, gimmick: { kind: 'dynamax', moveName: 'Max Flare', moveType: 'fire' } }),

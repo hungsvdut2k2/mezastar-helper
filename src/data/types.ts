@@ -41,7 +41,13 @@ export type Tag = {
   pokenergy: number | null;
   stats: TagStats;
   move: { name: string; type: PokemonType } | null;
-  gimmick: { kind: Gimmick; moveName: string | null; moveType: PokemonType | null } | null;
+  gimmick: {
+    kind: Gimmick;
+    moveName: string | null;
+    moveType: PokemonType | null;
+    /** Double Move only: the types of its two moves, in the order named (moveType is the first). */
+    moveTypes?: [PokemonType, PokemonType];
+  } | null;
   legendary: boolean;
   mythical: boolean;
   sources: string[];

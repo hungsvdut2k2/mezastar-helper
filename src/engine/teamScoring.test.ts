@@ -66,6 +66,14 @@ describe('scoreTeam', () => {
     expect(scoreTeam([d('a'), d('b'), normal], grassBossWaterCronies).score).toBeCloseTo(base + WEIGHTS.gimmick);
   });
 
+  it('gives Dynamax and Gigantamax one shared bonus per team', () => {
+    const dyna = (id: string) => makeTag(id, { gimmick: { kind: 'dynamax', moveName: null, moveType: null } });
+    const giga = (id: string) => makeTag(id, { gimmick: { kind: 'gigantamax', moveName: null, moveType: null } });
+    const one = scoreTeam([dyna('a'), makeTag('b'), normal], grassBossWaterCronies).score;
+    expect(scoreTeam([dyna('a'), giga('b'), normal], grassBossWaterCronies).score).toBeCloseTo(one);
+    expect(scoreTeam([giga('a'), giga('b'), normal], grassBossWaterCronies).score).toBeCloseTo(one);
+  });
+
   it('treats an unknown crony as type-neutral', () => {
     const ghostMove = makeTag('ghostMove', { move: { name: 'Lick', type: 'ghost' } });
     const fightingMove = makeTag('fightingMove', { move: { name: 'Karate Chop', type: 'fighting' } });

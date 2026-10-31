@@ -1,5 +1,5 @@
 import type { Gimmick, Tag } from '../data/types';
-import { attackType, LIMITED_GIMMICKS, statOrNeutral, type Battle } from './battleModel';
+import { attackType, LIMITED_GIMMICKS, limitKey, statOrNeutral, type Battle } from './battleModel';
 import { effectiveness, effectText } from './typeEffectiveness';
 
 /** Fixed weights for version 1. */
@@ -75,15 +75,15 @@ export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
   if (top <= 0 || good < 2) score -= WEIGHTS.rotationPenalty;
 
   // 4–5. Defense and special moves. An opponent with no known move or type gives no resist points.
-  // Mega, Dynamax and Z-Move count once per team: only one can be used per battle.
+  // Mega, Dynamax/Gigantamax (one shared limit) and Z-Move count once per team: only one can be used per battle.
   const limitedSeen = new Set<Gimmick>();
   for (const t of team) {
     for (const opp of battle.opponents) score += WEIGHTS.resist * (1 - effectiveness(attackType(opp, false), t.types));
     score += (statOrNeutral(t.stats.hp) + statOrNeutral(t.stats.defense)) / WEIGHTS.bulkDivisor;
     const kind = t.gimmick?.kind;
-    if (kind && !limitedSeen.has(kind)) {
+    if (kind && !limitedSeen.has(limitKey(kind))) {
       score += WEIGHTS.gimmick;
-      if (LIMITED_GIMMICKS.has(kind)) limitedSeen.add(kind);
+      if (LIMITED_GIMMICKS.has(kind)) limitedSeen.add(limitKey(kind));
     }
   }
 
