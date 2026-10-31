@@ -28,7 +28,7 @@ Trust levels: **confirmed** = official Mezastar Asia site; **community** = playe
 | "Everyone Attack!" sometimes happens on the last turn: slide all tags forward; your Support Pokémon join in. | confirmed | [battle](https://world.pokemonmezastar.com/sg/howto/battle.php) |
 | Catch Time comes after 3 turns or after you beat the Boss; you get one of the 3 opponents. Damage fills the Catch Gauge; a Ball Roulette picks Poké / Great / Ultra / Master Ball. Bonus Catch Time (tall grass) can follow. | confirmed | [after](https://world.pokemonmezastar.com/sg/howto/after.php), [battle](https://world.pokemonmezastar.com/sg/howto/battle.php) |
 | Tags show grade 2★–6★ (5★ Star, 6★ Superstar), type, Pokénergy, HP, Attack, Defense, Speed, move and move type. | confirmed | [tags](https://world.pokemonmezastar.com/sg/howto/about_tag.php) |
-| Stardust V3 Superstars: Lugia, Ho-Oh, Solgaleo, Lunala, Greninja, Zeraora, Eternatus, Keldeo, Grimmsnarl, Zygarde (codes 1-3-001 to 1-3-010). 70 tags in total. | community | [Kitakuji](https://kitakuji.id/blog/daftar-mezatag-pokemon-mezastar-stardust-version-3/) |
+| Stardust V3 Superstars: Lugia, Ho-Oh, Solgaleo, Lunala, Greninja, Zeraora, Eternatus, Keldeo, Grimmsnarl, Zygarde (codes 1-3-001 to 1-3-010). 70 numbered tags (1-3-001 to 1-3-070) plus 3 Regular Tags (R-1-1 to R-1-3). Stars are 1-3-011 to 1-3-025. | confirmed | [official Stardust V3 page](https://world.pokemonmezastar.com/sg/tag/33112/) |
 | Opponents shown are tags physically stocked in that machine, so Superstar chances depend on the machine. | community | Japanese player blogs |
 | Superstars appear more often in Special Tag Battles (two machines side by side). | community | Japanese player blogs |
 | Defeating the two weaker cronies quickly, then attacking the Superstar boss, improves the catch. | community | Japanese player blogs |
@@ -87,7 +87,7 @@ src/
 ## Game data
 
 ### Sources
-- Tag list for Stardust Version 3 (Asia): official site tag pages, cross-checked with the Kitakuji list.
+- Tag list (codes and names) for Stardust Version 3 (Asia): the [official Stardust V3 page](https://world.pokemonmezastar.com/sg/tag/33112/). Gimmicks (Dynamax: Keldeo, Grimmsnarl, Nidoqueen; Z-Move: Greninja, Zeraora, Chandelure; TAG Meza Tags) from the same page.
 - Per-tag details from community sources; anything not found is `null` and the player fills it in from the tag (the back of every tag prints HP, Attack, Defense, Speed, move and move type).
 - Standard Pokémon type chart (18 types).
 
@@ -141,15 +141,26 @@ Total = weighted sum. Weights are fixed constants in `engine/` for version 1. Mi
 
 Output: top 3 teams, each with a one-line reason (e.g. "Ho-Oh hits both Grass cronies hard; Keldeo handles the Dark-type Boss").
 
-### Battle plan
-For a recommended team, the engine produces a 3-turn plan, shown as cards:
+### Battle plan (searched, not fixed)
+No single plan is always best. "Defeat a crony first for a supporter" can lose to "hit the Boss now" when the crony can't be defeated in one hit, when a supporter arrives too late to matter, when a strong tag can beat the Boss early, or when a first-attack special move would be wasted on a crony.
 
-- **Turn 1**: attack with the tag that can defeat a crony fastest (super-effective and faster), so a Support Pokémon joins from turn 2. Use a tag with a first-attack special move here if it helps.
-- **Turn 2**: a different tag (avoid Tiredness): defeat the other crony, or hit the Boss if the first crony is still up.
-- **Turn 3**: strongest attack on the target to fill the Catch Gauge; if "Everyone Attack!" appears, slide all tags forward.
-- Reminders: scan a Support Ticket first if you have one; use the effectiveness preview (slide a tag forward) to double-check.
+So the engine searches every legal 3-turn sequence for the chosen team and picks the best:
 
-Each step shows the trust level of the rule it relies on. Because "can I choose which opponent to attack?" is still open, the plan words targets as "aim for" and the Guide asks the player to confirm. If confirmed otherwise, only the plan wording changes; the scoring stays the same.
+- **Search space**: each turn = (attacking tag, opponent aimed at). No tag attacks in two consecutive turns (Tiredness). At most 3 × 3 options per turn, so at most 729 sequences per team; it runs for the top 3 teams only.
+- **Estimated battle model** (`engine/battleModel.ts`), deterministic expected values:
+  - Damage = Attack × type effectiveness × gimmick multiplier (first attack only) ÷ a defense factor from the defender's Defense. Constants are placeholders until calibrated.
+  - Turn order from Speed (Tired tags count as slower).
+  - Opponent HP from its tag's printed HP; a defeated non-Boss opponent becomes a supporter from the next turn, adding an expected bonus per turn (+10 attack on the roulette, or a Support Attack).
+  - Expected damage taken from each opponent, so plans that lose a key tag early score lower.
+  - Beating the Boss ends the battle early (Catch Time).
+- **Objective**: maximize expected damage dealt to the target (proxy for the Catch Gauge), with a bonus for defeating the target if that is what triggers Catch Time, and a penalty for losing tags.
+- **Output**: the best plan as turn cards (who attacks, aim for whom, why), plus a one-line comparison against the default "crony first" plan, e.g. "Hitting the Boss on turn 1 is better here: no crony can be defeated in one hit."
+- **Fallback**: if key stats are missing, the engine uses the default rule-of-thumb plan (turn 1 defeat a crony, turn 2 different tag, turn 3 strongest hit on target) and labels it "rule of thumb".
+- Reminders on every plan: scan a Support Ticket first if you have one; slide a tag forward to preview effectiveness; slide all tags forward if "Everyone Attack!" appears.
+
+Each step shows the trust level of the rule it relies on. Because "can I choose which opponent to attack?" is still open, the model has a switch: if the target is chosen automatically, the search only varies the attacking tag. The Guide asks the player to confirm.
+
+**Calibration**: the play log records per-turn results when the player wants (attacker, aimed-at, defeated or not). Stats shows how often the model's "defeats in one hit" predictions were right, so the placeholder constants can be adjusted later (adjusting is out of scope for version 1; measuring is in scope).
 
 ### Performance
 Owned tags are expected in the low hundreds at most. The engine first ranks each tag individually against the 3 opponents, keeps the top 15, and scores combinations of those (455 combinations).
@@ -186,7 +197,7 @@ Logging is designed to take about 10 seconds: values prefilled from the Play scr
 
 ## Testing
 
-- Unit tests (Vitest) for `engine/`: type effectiveness, team scoring against 3 opponents, top-15 pruning, battle plan (crony first, no tag twice in a row, target last), stats calculations.
+- Unit tests (Vitest) for `engine/`: type effectiveness, team scoring against 3 opponents, top-15 pruning, battle model (damage, turn order, supporter bonus), plan search (never uses a tag twice in a row; picks "Boss first" in a scenario built so that it wins; picks "crony first" in a scenario built so that it wins; falls back to the rule of thumb when stats are missing), stats calculations including prediction accuracy.
 - Data validation tests: unique ids, grades 2–6, 1–2 valid types, valid trust levels, every mechanic has a source unless `open`.
 - Storage tests for backup/restore round-trip and invalid-file rejection (using a fake IndexedDB).
 - Manual check on iPhone Safari: add to home screen, works offline, data persists after closing.
