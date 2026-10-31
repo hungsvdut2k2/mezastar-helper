@@ -69,6 +69,10 @@ export function GuideScreen({ store }: { store: AppStore }) {
   return (
     <section>
       <h1>Guide</h1>
+      <p className="hint">
+        Add the app to your Home Screen before logging plays — the Home Screen app keeps its own data, separate from
+        Safari. Back up regularly.
+      </p>
       {ORDER.map((trust) => (
         <div key={trust}>
           <h2>{TRUST_LABEL[trust]}</h2>

@@ -25,6 +25,15 @@ export function App() {
   const store = useAppData();
   const [tab, setTab] = useState<TabId>('play');
 
+  // Ask the browser not to evict our data under storage pressure; the answer does not matter.
+  useEffect(() => {
+    try {
+      void navigator.storage?.persist?.()?.catch(() => {});
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // The panes share one page, so a new tab would otherwise open at the old scroll position.
   useEffect(() => {
     window.scrollTo(0, 0);

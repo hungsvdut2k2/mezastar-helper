@@ -28,6 +28,18 @@ it('scrolls to the top when the tab changes', async () => {
   scrollTo.mockRestore();
 });
 
+it('asks the browser for persistent storage once at startup', async () => {
+  const persist = vi.fn().mockResolvedValue(true);
+  Object.defineProperty(navigator, 'storage', { value: { persist }, configurable: true });
+  try {
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Play' });
+    expect(persist).toHaveBeenCalledTimes(1);
+  } finally {
+    Reflect.deleteProperty(navigator, 'storage');
+  }
+});
+
 it('keeps what was typed on Play when the player checks another tab', async () => {
   const user = userEvent.setup();
   render(<App />);
