@@ -1,7 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as dbModule from '../../storage/db';
-import { loadAll, putPhoto, saveCorrection } from '../../storage/db';
+import { TAGS } from '../../data/tags';
+import { addLogEntry, loadAll, putCustomTag, putPhoto, saveCorrection, setOwned } from '../../storage/db';
+import { makeLogEntry, makeTag } from '../../test/factories';
 import { freshDb } from '../../test/freshDb';
 import { WithStore } from '../testHarness';
 import { CollectionScreen } from './CollectionScreen';
@@ -14,14 +16,82 @@ it('toggles owned and keeps it after reopening', async () => {
   const user = userEvent.setup();
   const { unmount } = renderScreen();
   await screen.findByText('Owned 0 / 73');
-  const toggle = screen.getByRole('button', { name: 'Owned: Lugia 1-3-001' });
+  const toggle = screen.getByRole('button', { name: 'Owned: Lugia 1-3-001, Stardust V3' });
   expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await user.click(toggle);
   expect(await screen.findByText('Owned 1 / 73')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Owned: Lugia 1-3-001' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Owned: Lugia 1-3-001, Stardust V3' })).toHaveAttribute('aria-pressed', 'true');
   unmount();
   renderScreen();
   expect(await screen.findByText('Owned 1 / 73')).toBeInTheDocument();
+});
+
+describe('set filter', () => {
+  it('defaults to Stardust V3 and counts owned per set', async () => {
+    await setOwned('1-3-001', true);
+    await setOwned('1-3-002', true);
+    await setOwned('2-3-001', true);
+    renderScreen();
+    expect(await screen.findByRole('combobox', { name: 'Set' })).toHaveValue('stardust-v3');
+    expect(screen.getByText('Owned 2 / 73')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Owned: .*Galaxy V3$/ })).not.toBeInTheDocument();
+  });
+
+  it('lists All sets, the seven official sets and My tags', async () => {
+    renderScreen();
+    const options = within(await screen.findByRole('combobox', { name: 'Set' })).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual([
+      'All sets', 'Stardust V1', 'Stardust V2', 'Stardust V3', 'Stardust V4', 'Galaxy V1', 'Galaxy V2', 'Galaxy V3', 'My tags',
+    ]);
+  });
+
+  it('shows the owned total across every set for All sets', async () => {
+    const user = userEvent.setup();
+    await setOwned('1-3-001', true);
+    await setOwned('2-3-001', true);
+    await setOwned('1-1-001', true);
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'all');
+    expect(screen.getByText(`Owned 3 / ${TAGS.length}`)).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Set' }), 'galaxy-v3');
+    expect(screen.getByText('Owned 1 / 73')).toBeInTheDocument();
+  });
+
+  it('works together with search and the owned filter', async () => {
+    const user = userEvent.setup();
+    await setOwned('1-3-001', true);
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'stardust-v1');
+    expect(screen.getByText('Owned 0 / 70')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Owned' }));
+    expect(screen.getByText('No tags match.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'All' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), '1-1-009');
+    expect(screen.getAllByRole('button', { name: /^Charizard 1-1-009/ })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Lugia/ })).not.toBeInTheDocument();
+  });
+
+  it('tells apart Regular Tags that share a printed code across sets', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'all');
+    await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'R-2-1');
+    const toggles = screen.getAllByRole('button', { name: /^Owned: .* R-2-1, / });
+    const names = toggles.map((b) => b.getAttribute('aria-label'));
+    expect(names.length).toBeGreaterThan(1);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('shows the printed code and set name on each row and in the editor', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'galaxy-v2');
+    await user.type(screen.getByRole('searchbox', { name: 'Search tags' }), 'R-2-1');
+    const row = screen.getByRole('button', { name: /^.* R-2-1 · Galaxy V2/ });
+    await user.click(row);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('R-2-1');
+    expect(screen.getByText(/^Galaxy V2 ·/)).toBeInTheDocument();
+  });
 });
 
 it('searches by name or number', async () => {
@@ -142,4 +212,151 @@ it('removes a photo from the editor', async () => {
   await user.click(screen.getByRole('button', { name: 'Remove photo' }));
   expect(await screen.findByLabelText('Add photo')).toBeInTheDocument();
   expect(screen.queryByRole('img')).not.toBeInTheDocument();
+});
+
+
+describe('adding your own tag', () => {
+  const open = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole('button', { name: 'Add a tag' }));
+  };
+  const fill = async (user: ReturnType<typeof userEvent.setup>, code = 'X-1', name = 'Homebrew') => {
+    await user.type(screen.getByLabelText('Printed code'), code);
+    await user.type(screen.getByLabelText('Name'), name);
+    await user.selectOptions(screen.getByLabelText('Type'), 'fire');
+  };
+
+  it('saves a tag under My tags, stores it, and moves focus to it', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    expect(screen.getByRole('heading', { name: 'Add a tag' })).toHaveFocus();
+    await fill(user);
+    await user.selectOptions(screen.getByLabelText('Second type'), 'water');
+    await user.selectOptions(screen.getByLabelText('Grade'), '5');
+    await user.type(screen.getByLabelText('Move'), 'Steam Burst');
+    await user.selectOptions(screen.getByLabelText('Move type'), 'water');
+    await user.selectOptions(screen.getByLabelText('Special move'), 'mega');
+    await user.click(screen.getByLabelText('Mythical'));
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    const row = await screen.findByRole('button', { name: /^Homebrew X-1 · My tags · 5★ · Fire\/Water/ });
+    expect(row).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Set' })).toHaveValue('my-tags');
+    expect(screen.getByText('Owned 0 / 1')).toBeInTheDocument();
+    const [tag] = (await loadAll()).customTags;
+    expect(tag.id).toMatch(/^my-/);
+    expect(tag).toMatchObject({
+      printedCode: 'X-1', name: 'Homebrew', grade: 5, types: ['fire', 'water'], mythical: true, legendary: false,
+      move: { name: 'Steam Burst', type: 'water' }, gimmick: { kind: 'mega' },
+    });
+    expect(TAGS.some((t) => t.id === tag.id)).toBe(false);
+  });
+
+  it('lets the tag be marked owned', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    await user.click(await screen.findByRole('button', { name: 'Owned: Homebrew X-1, My tags' }));
+    expect(await screen.findByText('Owned 1 / 1')).toBeInTheDocument();
+    expect((await loadAll()).owned).toHaveLength(1);
+  });
+
+  it('announces missing fields and focuses the first one', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter the printed code');
+    expect(screen.getByLabelText('Printed code')).toHaveFocus();
+    await user.type(screen.getByLabelText('Printed code'), 'X-1');
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter the name');
+    await user.type(screen.getByLabelText('Name'), 'Homebrew');
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one type');
+    expect(screen.getByLabelText('Type')).toHaveFocus();
+    expect((await loadAll()).customTags).toEqual([]);
+  });
+
+  it('warns when the code matches an official tag, but still saves', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    await user.type(screen.getByLabelText('Printed code'), '1-3-001');
+    expect(await screen.findByText(/This code is already in Stardust V3: Lugia — mark that one owned instead\?/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Name'), 'Fake Lugia');
+    await user.selectOptions(screen.getByLabelText('Type'), 'psychic');
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    await screen.findByRole('button', { name: /^Fake Lugia 1-3-001/ });
+    expect((await loadAll()).customTags).toHaveLength(1);
+  });
+
+  it('keeps the form open and shows no ghost tag when saving fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(dbModule, 'putCustomTag').mockRejectedValueOnce(new Error('full'));
+    renderScreen();
+    await open(user);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Save tag' })).toBeEnabled());
+    expect(screen.getByRole('heading', { name: 'Add a tag' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Homebrew');
+    vi.restoreAllMocks();
+  });
+
+  it('edits a saved tag with the same form', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await open(user);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    await user.click(await screen.findByRole('button', { name: /^Homebrew X-1/ }));
+    expect(screen.getByRole('heading', { name: 'Edit Homebrew' })).toHaveFocus();
+    expect(screen.getByLabelText('Add photo')).toBeInTheDocument();
+    await user.clear(screen.getByLabelText('Name'));
+    await user.type(screen.getByLabelText('Name'), 'Renamed');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('button', { name: /^Renamed X-1/ })).toHaveFocus();
+    const data = await loadAll();
+    expect(data.customTags).toHaveLength(1);
+    expect(data.customTags[0].name).toBe('Renamed');
+  });
+
+  async function addAndOpenEdit(user: ReturnType<typeof userEvent.setup>) {
+    await open(user);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: 'Save tag' }));
+    await user.click(await screen.findByRole('button', { name: /^Homebrew X-1/ }));
+  }
+
+  it('deletes a tag after confirming, with its owned flag and photo', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await addAndOpenEdit(user);
+    const id = (await loadAll()).customTags[0].id;
+    await setOwned(id, true);
+    await putPhoto(id, new Blob(['x'], { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Delete tag' }));
+    expect(await screen.findByText(/Delete Homebrew\?/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    await screen.findByRole('heading', { name: 'Collection' });
+    expect(screen.getByRole('heading', { name: 'Collection' })).toHaveFocus();
+    expect(await loadAll()).toMatchObject({ customTags: [], owned: [] });
+    expect(await dbModule.getAllPhotos()).toEqual({});
+  });
+
+  it('blocks delete while a saved play uses the tag', async () => {
+    const user = userEvent.setup();
+    await putCustomTag(makeTag('my-fixed', { name: 'Homebrew', printedCode: 'X-1' }));
+    await addLogEntry(makeLogEntry({ id: 'p1', teamUsed: ['my-fixed'] }));
+    renderScreen();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Set' }), 'my-tags');
+    await user.click(screen.getByRole('button', { name: /^Homebrew X-1/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete tag' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Used in 1 saved play — can't delete");
+    expect(screen.getByRole('heading', { name: 'Edit Homebrew' })).toBeInTheDocument();
+    expect((await loadAll()).customTags).toHaveLength(1);
+  });
 });

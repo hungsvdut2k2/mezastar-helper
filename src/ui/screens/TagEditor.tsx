@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection, type TagStats } from '../../data/types';
+import { printedCode, setOfTag } from '../../data/setInfo';
 import { gradeLabel, typeLabel } from '../format';
-import { PhotoError, processPhoto, type Rasterizer } from '../photo';
+import type { Rasterizer } from '../photo';
+import { PhotoSection } from './PhotoSection';
 
 type Props = {
   /** The tag as the player currently sees it (shipped data plus any earlier correction). */
@@ -48,50 +50,9 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
   const [moveType, setMoveType] = useState<PokemonType>(tag.move?.type ?? tag.types[0] ?? POKEMON_TYPES[0]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoBusy, setPhotoBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
-  const refocusPhotoInput = useRef(false);
 
   useEffect(() => heading.current?.focus(), []);
-  // The Remove button disappears with the photo; keep keyboard and screen reader users where they were.
-  // The input is disabled while busy, so this has to wait until busy ends.
-  useEffect(() => {
-    if (!photoBusy && refocusPhotoInput.current) {
-      refocusPhotoInput.current = false;
-      photoInput.current?.focus();
-    }
-  }, [photoBusy]);
-
-  async function pickPhoto(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !onSetPhoto) return;
-    setPhotoError(null);
-    setPhotoBusy(true);
-    try {
-      const blob = await processPhoto(file, rasterizer);
-      // A storage failure is already reported by the app-wide message; only unreadable images are explained here.
-      await onSetPhoto(blob);
-    } catch (err) {
-      if (err instanceof PhotoError) setPhotoError(err.message);
-    } finally {
-      setPhotoBusy(false);
-    }
-  }
-
-  async function removePhoto() {
-    if (!onRemovePhoto) return;
-    setPhotoError(null);
-    setPhotoBusy(true);
-    try {
-      if (await onRemovePhoto()) refocusPhotoInput.current = true;
-    } finally {
-      setPhotoBusy(false);
-    }
-  }
-
   async function save() {
     const parsed = {} as Record<Field, number | null>;
     for (const [field, label] of FIELDS) {
@@ -141,35 +102,15 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
         ‹ Back
       </button>
       <h1 ref={heading} tabIndex={-1}>
-        {tag.name} <small>{tag.id}</small>
+        {tag.name} <small>{printedCode(tag)}</small>
       </h1>
       <p>
+        {setOfTag(tag)?.name && `${setOfTag(tag)?.name} · `}
         {gradeLabel(tag.grade)}
         {tag.gimmick && ` · ${GIMMICK_NAME[tag.gimmick.kind]}${tag.gimmick.moveName ? `: ${tag.gimmick.moveName}` : ''}`}
       </p>
       {onSetPhoto && (
-        <div className="photo-editor">
-          {photoUrl && <img className="tag-photo" src={photoUrl} alt={`Photo of ${tag.name}`} width={96} />}
-          <div className="actions">
-            <label className="file-button">
-              {photoUrl ? 'Change photo' : 'Add photo'}
-              <input ref={photoInput} type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} />
-            </label>
-            {photoUrl && onRemovePhoto && (
-              <button type="button" disabled={photoBusy} onClick={removePhoto}>
-                Remove photo
-              </button>
-            )}
-          </div>
-          <p className="hint" role="status">
-            {photoBusy ? 'Processing photo…' : ''}
-          </p>
-          {photoError && (
-            <p className="error" role="alert">
-              {photoError}
-            </p>
-          )}
-        </div>
+        <PhotoSection tagName={tag.name} photoUrl={photoUrl} onSetPhoto={onSetPhoto} onRemovePhoto={onRemovePhoto} rasterizer={rasterizer} />
       )}
       <p className="hint">Copy the numbers from the back of your tag. Leave a box empty if you don't know it.</p>
 
