@@ -74,6 +74,7 @@ small { color: var(--muted); font-weight: 400; }
 .file-button { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; margin: 0; font-weight: 400; }
 .file-button { position: relative; }
 .file-button input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.file-button:has(input:disabled) { opacity: 0.5; }
 .file-button:focus-within { outline: 3px solid var(--navy); outline-offset: 2px; }
 details { border-bottom: 1px solid var(--line); padding: 4px 0; }
 summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }

@@ -51,8 +51,18 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const refocusPhotoInput = useRef(false);
 
   useEffect(() => heading.current?.focus(), []);
+  // The Remove button disappears with the photo; keep keyboard and screen reader users where they were.
+  // The input is disabled while busy, so this has to wait until busy ends.
+  useEffect(() => {
+    if (!photoBusy && refocusPhotoInput.current) {
+      refocusPhotoInput.current = false;
+      photoInput.current?.focus();
+    }
+  }, [photoBusy]);
 
   async function pickPhoto(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -76,7 +86,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
     setPhotoError(null);
     setPhotoBusy(true);
     try {
-      await onRemovePhoto();
+      if (await onRemovePhoto()) refocusPhotoInput.current = true;
     } finally {
       setPhotoBusy(false);
     }
@@ -143,7 +153,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
           <div className="actions">
             <label className="file-button">
               {photoUrl ? 'Change photo' : 'Add photo'}
-              <input type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} />
+              <input ref={photoInput} type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} />
             </label>
             {photoUrl && onRemovePhoto && (
               <button type="button" disabled={photoBusy} onClick={removePhoto}>
@@ -151,6 +161,9 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
               </button>
             )}
           </div>
+          <p className="hint" role="status">
+            {photoBusy ? 'Processing photo…' : ''}
+          </p>
           {photoError && (
             <p className="error" role="alert">
               {photoError}

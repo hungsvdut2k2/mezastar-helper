@@ -89,7 +89,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
               >
                 {isOwned ? '✓' : ''}
               </button>
-              {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt={`Photo of ${t.name}`} width={44} height={44} />}
+              {store.photos.has(t.id) && <img className="tag-thumb" src={store.photos.get(t.id)} alt="" width={44} height={44} />}
               <button type="button" className="tag-row" data-row-id={t.id} onClick={() => setEditingId(t.id)}>
                 <strong>{t.name}</strong> <small>{`${t.id} · ${gradeLabel(t.grade)} · ${t.types.map(typeLabel).join('/')}`}</small>
               </button>

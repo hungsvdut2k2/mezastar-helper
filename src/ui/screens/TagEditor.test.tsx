@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TAGS } from '../../data/tags';
@@ -74,4 +75,39 @@ it('adds no second message when removing fails', async () => {
   await user.click(screen.getByRole('button', { name: 'Remove photo' }));
   await waitFor(() => expect(onRemovePhoto).toHaveBeenCalled());
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+it('says it is processing while the photo is being handled', async () => {
+  let finish!: (b: Blob) => void;
+  const { user } = setup({ rasterizer: () => new Promise<Blob>((r) => (finish = r)) });
+  await user.upload(screen.getByLabelText('Add photo'), picture());
+  expect(screen.getByRole('status')).toHaveTextContent('Processing photo…');
+  expect(screen.getByLabelText('Add photo')).toBeDisabled();
+  finish(jpeg);
+  await waitFor(() => expect(screen.getByRole('status')).toBeEmptyDOMElement());
+});
+
+it('moves focus to Add photo after the photo is removed', async () => {
+  function Host() {
+    const [url, setUrl] = React.useState<string | undefined>('blob:x');
+    return (
+      <TagEditor
+        tag={lugia}
+        shipped={lugia}
+        hasCorrection={false}
+        onSave={() => {}}
+        onReset={() => {}}
+        onClose={() => {}}
+        photoUrl={url}
+        onSetPhoto={async () => true}
+        onRemovePhoto={async () => {
+          setUrl(undefined);
+          return true;
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Remove photo' }));
+  await waitFor(() => expect(screen.getByLabelText('Add photo')).toHaveFocus());
 });

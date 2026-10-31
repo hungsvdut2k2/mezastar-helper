@@ -125,8 +125,10 @@ it('shows a thumbnail in the list for tags with a photo, and offers Add photo in
   const user = userEvent.setup();
   await putPhoto('1-3-001', new Blob(['x'], { type: 'image/jpeg' }));
   renderScreen();
-  expect(await screen.findByRole('img', { name: 'Photo of Lugia' })).toBeInTheDocument();
-  expect(screen.getAllByRole('img')).toHaveLength(1);
+  await waitFor(() => expect(document.querySelectorAll('img.tag-thumb')).toHaveLength(1));
+  // Decorative: the row's own text already names the tag.
+  expect(document.querySelector('img.tag-thumb')).toHaveAttribute('alt', '');
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /^Lugia 1-3-001/ }));
   expect(screen.getByLabelText('Change photo')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
