@@ -1,7 +1,8 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { computeStats, type Rate } from '../../engine/stats';
-import { makeBackup } from '../../storage/backup';
-import { percent } from '../format';
+import { makeBackup, parseBackup } from '../../storage/backup';
+import type { AppData } from '../../storage/db';
+import { localDate, percent } from '../format';
 import type { AppStore } from '../useAppData';
 
 const showRate = (r: Rate) => (r.rate === null ? '—' : `${percent(r.rate)} (${r.caught}/${r.count})`);
@@ -24,27 +25,99 @@ function Row({ label, value, testId }: { label: string; value: string | number; 
   );
 }
 
+type Message = { kind: 'ok' | 'error'; text: string };
+type PendingRestore = { text: string; data: AppData; exportedAt: string | null };
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
+const timeOf = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 export function StatsScreen({ store }: { store: AppStore }) {
   const stats = useMemo(() => computeStats(store.data.log, store.tags), [store.data.log, store.tags]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
+  const [pending, setPending] = useState<PendingRestore | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const nameOf = (id: string | null) => store.tags.find((t) => t.id === id)?.name ?? 'nothing';
 
-  function backup() {
+  async function backup() {
     const json = JSON.stringify(makeBackup(store.data), null, 2);
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mezastar-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const file = new File([json], `mezastar-backup-${localDate(new Date())}.json`, { type: 'application/json' });
+    // On iPhone the share sheet has "Save to Files"; a plain download link is the fallback.
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file] });
+        setMessage({ kind: 'ok', text: 'Backup created.' });
+        return;
+      } catch (e) {
+        if (isAbort(e)) {
+          setMessage({ kind: 'ok', text: 'Backup cancelled. Nothing was saved.' });
+          return;
+        }
+        // Any other sharing problem: try a normal download instead.
+      }
+    }
+    try {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setMessage({ kind: 'ok', text: 'Backup created.' });
+    } catch {
+      setMessage({ kind: 'error', text: 'Could not create the backup.' });
+    }
   }
 
-  async function restore(e: ChangeEvent<HTMLInputElement>) {
+  async function pickFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const result = await store.restore(await readFileText(file));
-    setMessage(result.ok ? 'Backup restored.' : `Restore failed: ${result.error} Nothing was changed.`);
+    setMessage(null);
+    setPending(null);
+    let text: string;
+    try {
+      text = await readFileText(file);
+    } catch {
+      setMessage({ kind: 'error', text: 'Restore failed: could not read that file. Nothing was changed.' });
+      return;
+    }
+    const parsed = parseBackup(text);
+    if (!parsed.ok) {
+      setMessage({ kind: 'error', text: `Restore failed: ${parsed.error} Nothing was changed.` });
+      return;
+    }
+    let exportedAt: string | null = null;
+    try {
+      const raw = JSON.parse(text) as { exportedAt?: unknown };
+      if (typeof raw.exportedAt === 'string') exportedAt = raw.exportedAt;
+    } catch {
+      // parseBackup already accepted the text, so this cannot happen; keep the date unknown.
+    }
+    setPending({ text, data: parsed.data, exportedAt });
+  }
+
+  async function replace() {
+    if (!pending) return;
+    const { text } = pending;
+    setPending(null);
+    const result = await store.restore(text);
+    setMessage(
+      result.ok
+        ? { kind: 'ok', text: 'Backup restored.' }
+        : { kind: 'error', text: `Restore failed: ${result.error} Nothing was changed.` },
+    );
+  }
+
+  function describe(e: (typeof store.data.log)[number]) {
+    const when = `${localDate(e.date)} ${timeOf(e.date)}`.trim();
+    const where = e.location ? ` · ${e.location}` : '';
+    return `${when}${where} · Boss ${nameOf(e.boss)} · target ${nameOf(e.target)} · caught ${nameOf(e.caught)}`;
   }
 
   return (
@@ -90,10 +163,28 @@ export function StatsScreen({ store }: { store: AppStore }) {
       <ul className="log">
         {store.data.log.map((e) => (
           <li key={e.id}>
-            <span>{`${e.date.slice(0, 10)} · Boss ${nameOf(e.boss)} · caught ${nameOf(e.caught)}`}</span>
-            <button type="button" aria-label={`Delete play ${e.date.slice(0, 10)} ${nameOf(e.boss)}`} onClick={() => store.deleteLog(e.id)}>
-              ✕
-            </button>
+            <span>{describe(e)}</span>
+            {confirmingDelete === e.id ? (
+              <span role="group" aria-label="Confirm delete">
+                Delete this play?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingDelete(null);
+                    store.deleteLog(e.id);
+                  }}
+                >
+                  Yes
+                </button>{' '}
+                <button type="button" onClick={() => setConfirmingDelete(null)}>
+                  No
+                </button>
+              </span>
+            ) : (
+              <button type="button" aria-label={`Delete play ${describe(e)}`} onClick={() => setConfirmingDelete(e.id)}>
+                ✕
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -106,10 +197,38 @@ export function StatsScreen({ store }: { store: AppStore }) {
         </button>
         <label className="file-button">
           Restore from backup
-          <input type="file" accept="application/json,.json" onChange={restore} />
+          <input type="file" accept="application/json,.json" onChange={pickFile} />
         </label>
       </div>
-      {message && <p className="notice">{message}</p>}
+      {pending && (
+        <div className="notice" role="group" aria-label="Confirm restore">
+          <p>
+            {`This backup is from ${pending.exportedAt ? localDate(pending.exportedAt) : 'an unknown date'}: ${plural(pending.data.log.length, 'play')}, ${plural(pending.data.owned.length, 'owned tag')}. It will REPLACE your current ${plural(store.data.log.length, 'play')} and ${plural(store.data.owned.length, 'owned tag')}.`}
+          </p>
+          <div className="actions">
+            <button type="button" onClick={backup}>
+              Save a backup of current data first
+            </button>
+            <button type="button" className="primary" onClick={replace}>
+              Replace
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPending(null);
+                setMessage({ kind: 'ok', text: 'Restore cancelled. Nothing was changed.' });
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {message && (
+        <p className={message.kind === 'error' ? 'error' : 'notice'} role={message.kind === 'error' ? 'alert' : 'status'}>
+          {message.text}
+        </p>
+      )}
     </section>
   );
 }
