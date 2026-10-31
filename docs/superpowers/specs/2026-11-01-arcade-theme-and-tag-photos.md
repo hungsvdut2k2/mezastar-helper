@@ -27,7 +27,7 @@ The player found the v1 UI too plain. Make it feel like the arcade machine ("Arc
 ## Tag photos
 - Collection → tag editor: "Add photo" / "Change photo" / "Remove photo". Uses `<input type="file" accept="image/*">` (iOS offers camera or library).
 - Before storing, downscale on a canvas to max 600px on the long side, encode JPEG quality ~0.8. Reject non-images and decode failures with a clear message.
-- Storage: new IndexedDB object store `photos` keyed by tag id, value `Blob`. DB version 2, upgrade guarded by `oldVersion < 2`; existing data untouched.
+- Storage: new IndexedDB object store `photos` keyed by tag id, value `{ type: string, bytes: ArrayBuffer }` (not a Blob, as insurance against WebKit IndexedDB Blob bugs; `db.ts` converts at its boundary, so the API still takes and returns Blobs). If another tab holds an older version open, the upgrade is blocked and the app tells the player to close other tabs. DB version 2, upgrade guarded by `oldVersion < 2`; existing data untouched.
 - UI: `useAppData` exposes `photos: Map<tagId, objectURL>`, `setPhoto(id, blob)`, `removePhoto(id)`. Object URLs are revoked when replaced/removed/unmounted.
 - Backup: optional `photos: { [tagId]: dataURL }` field. Validation: known tag id, `data:image/(jpeg|png|webp);base64,` prefix, at most ~2 MB per photo. Old backups without `photos` still restore. Restore replaces photos together with everything else (all-or-nothing).
 - Stats screen notes that backups include photos and may be larger.

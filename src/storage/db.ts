@@ -13,11 +13,32 @@ interface HelperDB extends DBSchema {
   corrections: { key: string; value: TagCorrection };
   notes: { key: string; value: string };
   log: { key: string; value: PlayLogEntry };
-  photos: { key: string; value: Blob };
+  photos: { key: string; value: PhotoRecord };
 }
+
+/** Photos are stored as plain bytes, not Blobs: older WebKit versions mishandle Blobs in IndexedDB. */
+type PhotoRecord = { type: string; bytes: ArrayBuffer };
+
+function readBytes(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+const toRecord = async (blob: Blob): Promise<PhotoRecord> => ({ type: blob.type, bytes: await readBytes(blob) });
+const toBlob = (r: PhotoRecord) => new Blob([r.bytes], { type: r.type });
 
 const DB_NAME = 'mezastar-helper';
 let dbPromise: Promise<IDBPDatabase<HelperDB>> | null = null;
+
+const blockedListeners = new Set<() => void>();
+/** Called when opening is stuck because another tab still holds an older version open. Returns an unsubscribe. */
+export function onDbBlocked(listener: () => void) {
+  blockedListeners.add(listener);
+  return () => void blockedListeners.delete(listener);
+}
 
 function getDb() {
   if (!dbPromise) {
@@ -32,6 +53,10 @@ function getDb() {
         if (oldVersion < 2) {
           db.createObjectStore('photos');
         }
+      },
+      // An old tab keeps the previous version open, so our upgrade has to wait for it.
+      blocked() {
+        blockedListeners.forEach((l) => l());
       },
       // Another tab wants to upgrade or delete the database: let go so it can.
       blocking() {
@@ -82,13 +107,14 @@ export async function loadAll(): Promise<AppData> {
 /** Tag photos by tag id. Kept out of AppData: they are binary and loaded/backed up separately. */
 export async function getAllPhotos(): Promise<Record<string, Blob>> {
   const db = await getDb();
-  const [ids, blobs] = await Promise.all([db.getAllKeys('photos'), db.getAll('photos')]);
-  return zip(ids, blobs);
+  const [ids, records] = await Promise.all([db.getAllKeys('photos'), db.getAll('photos')]);
+  return zip(ids, records.map(toBlob));
 }
 
 export async function putPhoto(id: string, blob: Blob) {
+  const record = await toRecord(blob);
   const db = await getDb();
-  await db.put('photos', blob, id);
+  await db.put('photos', record, id);
 }
 
 export async function deletePhoto(id: string) {
@@ -125,6 +151,8 @@ export async function deleteLogEntry(id: string) {
 
 /** Replace all data in one transaction: either everything is written or nothing changes. */
 export async function replaceAll(data: AppData, photos: Record<string, Blob> = {}) {
+  // Read the bytes first: a transaction closes if we wait on anything else while it is open.
+  const records = await Promise.all(Object.entries(photos).map(async ([id, blob]) => [id, await toRecord(blob)] as const));
   const db = await getDb();
   const tx = db.transaction(['owned', 'corrections', 'notes', 'log', 'photos'], 'readwrite');
   const owned = tx.objectStore('owned');
@@ -140,7 +168,7 @@ export async function replaceAll(data: AppData, photos: Record<string, Blob> = {
     for (const [id, c] of Object.entries(data.corrections)) pending.push(corrections.put(c, id));
     for (const [id, text] of Object.entries(data.notes)) pending.push(notes.put(text, id));
     for (const entry of data.log) pending.push(log.put(entry));
-    for (const [id, blob] of Object.entries(photos)) pending.push(photoStore.put(blob, id));
+    for (const [id, record] of records) pending.push(photoStore.put(record, id));
     await Promise.all(pending);
   } catch (err) {
     // A synchronous failure would otherwise let the transaction commit the clears.
