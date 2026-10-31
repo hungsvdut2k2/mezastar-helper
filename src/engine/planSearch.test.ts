@@ -49,6 +49,18 @@ describe('bestPlan', () => {
     expect(plan.steps[1].why).toContain('Tired: attacks later, no Roulette boost.');
   });
 
+  it('uses a fresh tag instead of a tired one when the Boss is finished either way', () => {
+    const team = [makeTag('A'), makeTag('B'), makeTag('C')];
+    const plan = bestPlan(team, battleOf(opp('boss', { stats: { hp: 150 } }), opp('c1'), opp('c2')))!;
+    for (let i = 1; i < plan.steps.length; i++) expect(plan.steps[i].tagId).not.toBe(plan.steps[i - 1].tagId);
+  });
+
+  it('does not repeat a tag on a crony target that one hit defeats', () => {
+    const team = [makeTag('A'), makeTag('B'), makeTag('C')];
+    const plan = bestPlan(team, battleOf(opp('boss'), opp('c1', { stats: { hp: 100 } }), opp('c2'), 1))!;
+    for (let i = 1; i < plan.steps.length; i++) expect(plan.steps[i].tagId).not.toBe(plan.steps[i - 1].tagId);
+  });
+
   it('can aim at a crony target', () => {
     const team = [makeTag('A'), makeTag('B')];
     const plan = bestPlan(team, battleOf(opp('boss'), opp('c1'), opp('c2'), 1))!;

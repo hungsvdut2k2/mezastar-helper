@@ -27,7 +27,7 @@ const toText = (v: number | null) => (v === null ? '' : String(v));
 
 export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose }: Props) {
   const [grade, setGrade] = useState(tag.grade === null ? '' : String(tag.grade));
-  const [type1, setType1] = useState<PokemonType>(tag.types[0]);
+  const [type1, setType1] = useState<PokemonType>(tag.types[0] ?? POKEMON_TYPES[0]);
   const [type2, setType2] = useState<string>(tag.types[1] ?? '');
   const [numbers, setNumbers] = useState<Record<Field, string>>({
     pokenergy: toText(tag.pokenergy),
@@ -37,7 +37,7 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
     speed: toText(tag.stats.speed),
   });
   const [moveName, setMoveName] = useState(tag.move?.name ?? '');
-  const [moveType, setMoveType] = useState<PokemonType>(tag.move?.type ?? tag.types[0]);
+  const [moveType, setMoveType] = useState<PokemonType>(tag.move?.type ?? tag.types[0] ?? POKEMON_TYPES[0]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);

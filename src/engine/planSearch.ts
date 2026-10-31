@@ -65,7 +65,7 @@ function nonTargetBossDamage(result: SimResult, battle: Battle): number {
 /**
  * Positive when plan a is better than plan b. Highest score first; ties go to
  * earlier damage on the target, then less damage on a non-target Boss, then fewer
- * lost tags, then the shorter plan. Remaining ties keep the first plan found.
+ * lost tags, then fewer tired turns, then the shorter plan. Remaining ties keep the first plan found.
  */
 function comparePlans(a: Found, b: Found, battle: Battle): number {
   let d = diff(a.result.score, b.result.score);
@@ -79,6 +79,8 @@ function comparePlans(a: Found, b: Found, battle: Battle): number {
   d = diff(nonTargetBossDamage(b.result, battle), nonTargetBossDamage(a.result, battle));
   if (d) return d;
   d = b.result.tagsLost - a.result.tagsLost;
+  if (d) return d;
+  d = b.result.outcomes.filter((o) => o.tired).length - a.result.outcomes.filter((o) => o.tired).length;
   if (d) return d;
   return b.turns.length - a.turns.length;
 }
@@ -190,7 +192,7 @@ function ruleStep(team: Tag[], battle: Battle, turn: Turn, index: number): PlanS
   const opp = battle.opponents[turn.aimAt];
   const reasons: [string, Trust][] = [
     [`Try to defeat ${opp.name} first so it becomes your Support Pokémon.`, 'community'],
-    ['Use a different tag: the first one is tired (it would act later, without the Roulette boost).', 'confirmed'],
+    ['Use a different tag: the first one is tired (it would act later, without the Roulette boost).', 'player'],
     ['Your strongest available hit on the target.', 'player'],
   ];
   const [why, trust] = reasons[index];
