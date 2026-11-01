@@ -1,8 +1,8 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import type { Tag } from '../../data/types';
-import type { Battle } from '../../engine/battleModel';
+import { attackOf, type Battle } from '../../engine/battleModel';
 import { cronyPool, unknownOpponent } from '../../engine/recommend';
-import { BestTeam } from '../components/BestTeam';
+import { BestTeam, ScopeSwitch, type Scope } from '../components/BestTeam';
 import { Recommendations } from '../components/Recommendations';
 import { printedCode } from '../../data/setInfo';
 import { typeVars } from '../components/TagCard';
@@ -40,6 +40,11 @@ export function PlanScreen({ store }: { store: AppStore }) {
     [target, crony1, crony2],
   );
   const pool = useMemo(() => (target ? cronyPool(target, store.tags) : undefined), [target, store.tags]);
+  const [scope, setScope] = useState<Scope>('all');
+  const ownedIds = useMemo(() => new Set(store.data.owned), [store.data.owned]);
+  // Every tag the battle model can judge: HP, the attacking stat and Speed known.
+  const statted = useMemo(() => store.tags.filter((t) => t.stats.hp !== null && attackOf(t) !== null && t.stats.speed !== null), [store.tags]);
+  const candidates = scope === 'all' ? statted : owned;
   const blankCrony = !crony1 || !crony2;
 
   return (
@@ -79,7 +84,19 @@ export function PlanScreen({ store }: { store: AppStore }) {
           blank crony slot. Fill a crony in to plan for it exactly.
         </p>
       )}
-      {battle && <Recommendations owned={owned} battle={battle} photos={store.photos} cronyPool={pool} />}
+      {battle && (
+        <>
+          <ScopeSwitch scope={scope} onChange={setScope} />
+          {scope === 'all' && <p className="hint">Teams from every tag with known stats, whether you own it or not.</p>}
+          <Recommendations
+            owned={candidates}
+            battle={battle}
+            photos={store.photos}
+            cronyPool={pool}
+            ownedIds={scope === 'all' ? ownedIds : undefined}
+          />
+        </>
+      )}
       {!target && <BestTeam tags={store.tags} ownedIds={store.data.owned} photos={store.photos} />}
     </section>
   );

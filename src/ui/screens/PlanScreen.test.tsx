@@ -18,6 +18,18 @@ it('plans for a Superstar picked with one tap, using unknown cronies', async () 
   expect(screen.getAllByText(/^Defeats Lugia in \d+% of 200 sampled crony pairs \(of [\d,]+ possible\) from Stardust V3\.$/).length).toBeGreaterThan(0);
 });
 
+it('builds target teams from every tag by default, saying which members are missing, or only from owned tags', async () => {
+  for (const id of ['1-3-002', '1-3-008']) await setOwned(id, true);
+  const user = userEvent.setup();
+  render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
+  await user.click(await screen.findByRole('button', { name: 'Lugia 1-3-001' }));
+  expect(screen.getByRole('button', { name: 'Every tag' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getAllByText(/^You own \d of 3\. Missing: |^You own all of these\.$/)).toHaveLength(3);
+  await user.click(screen.getByRole('button', { name: 'Only my tags' }));
+  expect(screen.getByText(/^Team 1: (Ho-Oh \+ Keldeo|Keldeo \+ Ho-Oh)$/)).toBeInTheDocument();
+  expect(screen.queryByText(/^You own \d of 3/)).not.toBeInTheDocument();
+});
+
 it('offers the Superstars of the chosen set only, labelled with name and code', async () => {
   const user = userEvent.setup();
   render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
