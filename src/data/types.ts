@@ -4,14 +4,15 @@ export const POKEMON_TYPES = [
 ] as const;
 export type PokemonType = (typeof POKEMON_TYPES)[number];
 
-export type Grade = 2 | 3 | 4 | 5 | 6; // 5 = Star, 6 = Superstar
+export type Grade = 1 | 2 | 3 | 4 | 5 | 6; // 5 = Star, 6 = Superstar; 1 only occurs on player-added tags
 
-export const GIMMICKS = ['mega', 'dynamax', 'zmove', 'tagMove', 'doubleMove', 'chainAttack'] as const;
+export const GIMMICKS = ['mega', 'dynamax', 'gigantamax', 'zmove', 'tagMove', 'doubleMove', 'chainAttack'] as const;
 export type Gimmick = (typeof GIMMICKS)[number];
 
 export const GIMMICK_NAME: Record<Gimmick, string> = {
   mega: 'Mega Evolution',
   dynamax: 'Dynamax',
+  gigantamax: 'Gigantamax',
   zmove: 'Z-Move',
   tagMove: 'TAG Move',
   doubleMove: 'Double Move',
@@ -30,14 +31,23 @@ export type TagStats = {
 };
 
 export type Tag = {
-  id: string; // as printed, e.g. "1-3-002"
+  /** Unique app-wide. The printed code (Regular Tags are R-1-n / R-2-n, one id per series; see setInfo.ts). */
+  id: string;
+  /** Set only for player-added tags, whose id is generated and differs from the code they record. */
+  printedCode?: string;
   name: string;
   grade: Grade | null;
   types: PokemonType[]; // 1 or 2
   pokenergy: number | null;
   stats: TagStats;
   move: { name: string; type: PokemonType } | null;
-  gimmick: { kind: Gimmick; moveName: string | null; moveType: PokemonType | null } | null;
+  gimmick: {
+    kind: Gimmick;
+    moveName: string | null;
+    moveType: PokemonType | null;
+    /** Double Move only: the types of its two moves, in the order named (moveType is the first). */
+    moveTypes?: [PokemonType, PokemonType];
+  } | null;
   legendary: boolean;
   mythical: boolean;
   sources: string[];

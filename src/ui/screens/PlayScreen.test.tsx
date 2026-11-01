@@ -25,7 +25,7 @@ async function enterBattle() {
 it('recommends a team and plan once all three opponents are entered', async () => {
   await enterBattle();
   expect(screen.getByText(/^Team 1:/)).toBeInTheDocument();
-  expect(screen.getAllByText(/^Turn 1:/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/^Turn 1$/).length).toBeGreaterThan(0);
 });
 
 it('lets the player switch the target to a crony', async () => {
@@ -72,7 +72,7 @@ it('names its button rows as groups', async () => {
 it('keeps the target on a cleared slot instead of switching to the Boss', async () => {
   const user = await enterBattle();
   await user.click(screen.getByRole('button', { name: 'Pidgeot' }));
-  await user.click(screen.getByRole('button', { name: 'Clear Crony 1' }));
+  await user.click(screen.getByRole('button', { name: /^Clear Crony 1/ }));
   expect(screen.getByRole('button', { name: 'Crony 1 (needs opponent)' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText(/Your target is Crony 1/)).toBeInTheDocument();
   await user.type(screen.getByLabelText('Crony 1'), 'Pidgeot');

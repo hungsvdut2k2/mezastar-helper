@@ -23,6 +23,23 @@ describe('damage', () => {
     expect(damage(z, psychic, false)).toBe(100);
   });
 
+  it('makes a Double Move two hits, each half of the total with its own effectiveness', () => {
+    const raikou = makeTag('raikou', {
+      types: ['electric'],
+      gimmick: { kind: 'doubleMove', moveName: 'Thunder + Crunch', moveType: 'electric', moveTypes: ['electric', 'dark'] },
+    });
+    const total = MODEL.gimmickMultiplier.doubleMove;
+    // Ground is immune to Thunder, but Crunch still lands.
+    expect(damage(raikou, makeTag('g', { types: ['ground'] }), true)).toBeCloseTo((100 * total) / 2);
+    expect(damage(raikou, makeTag('n'), true)).toBeCloseTo(100 * total);
+    const zacian = makeTag('zacian', {
+      types: ['fairy', 'steel'],
+      gimmick: { kind: 'doubleMove', moveName: 'Behemoth Blade + Moonblast', moveType: 'steel', moveTypes: ['steel', 'fairy'] },
+    });
+    // Steel is neutral on Dragon; Moonblast is 2x on Dragon: (1 + 2) / 2 of the total.
+    expect(damage(zacian, makeTag('d', { types: ['dragon'] }), true)).toBeCloseTo(100 * total * 1.5);
+  });
+
   it('treats unknown stats as average', () => {
     const unknown = makeTag('u', { stats: { attack: null } });
     expect(damage(unknown, makeTag('n'), false)).toBe(MODEL.neutralStat);
@@ -106,6 +123,15 @@ describe('simulate', () => {
     const battle = battleOf(opp('boss', { stats: { hp: 5000 } }), opp('c1'), opp('c2'));
     const r = simulate([d1, d2], battle, [{ tagIndex: 0, aimAt: 0 }, { tagIndex: 1, aimAt: 0 }])!;
     expect(r.outcomes.map((o) => o.usedGimmick)).toEqual([true, true]);
+  });
+
+  it('shares one once-per-battle limit between Dynamax and Gigantamax', () => {
+    const dyna = makeTag('dyna', { gimmick: { kind: 'dynamax', moveName: null, moveType: null } });
+    const giga = makeTag('giga', { gimmick: { kind: 'gigantamax', moveName: null, moveType: null } });
+    const battle = battleOf(opp('boss', { stats: { hp: 5000 } }), opp('c1'), opp('c2'));
+    const turns = [{ tagIndex: 0, aimAt: 0 as const }, { tagIndex: 1, aimAt: 0 as const }];
+    expect(simulate([dyna, giga], battle, turns)!.outcomes.map((o) => o.usedGimmick)).toEqual([true, false]);
+    expect(simulate([giga, dyna], battle, turns)!.outcomes.map((o) => o.usedGimmick)).toEqual([true, false]);
   });
 
   it('uses each limited special move (Mega, Dynamax, Z-Move) once per battle', () => {

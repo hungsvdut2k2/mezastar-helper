@@ -1,12 +1,18 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { setById } from '../data/setInfo';
+import { StarBadge, TAB_ICONS } from './components/icons';
 import { CollectionScreen } from './screens/CollectionScreen';
 import { GuideScreen } from './screens/GuideScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { PlayScreen } from './screens/PlayScreen';
 import { StatsScreen } from './screens/StatsScreen';
+import { DEFAULT_SET } from './setChoices';
 import { useAppData } from './useAppData';
 
 type TabId = 'play' | 'plan' | 'collection' | 'guide' | 'stats';
+
+/** The machine set the app is tuned for. There is no global setting yet, so this is the default set. */
+const MACHINE_SET = DEFAULT_SET === 'all' ? null : setById(DEFAULT_SET);
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'play', label: 'Play' },
@@ -24,6 +30,20 @@ function Pane({ active, children }: { active: boolean; children: ReactNode }) {
 export function App() {
   const store = useAppData();
   const [tab, setTab] = useState<TabId>('play');
+  const appRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Headings scroll under the sticky header (which grows when the error banner shows), so publish its height.
+  useEffect(() => {
+    const app = appRef.current;
+    const header = headerRef.current;
+    if (!app || !header || typeof ResizeObserver === 'undefined') return;
+    const measure = () => app.style.setProperty('--topbar-h', `${header.offsetHeight}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   // Ask the browser not to evict our data under storage pressure; the answer does not matter.
   useEffect(() => {
@@ -40,15 +60,28 @@ export function App() {
   }, [tab]);
 
   return (
-    <div className="app">
-      {store.error && (
-        <p className="error banner" role="alert">
-          {store.error}{' '}
-          <button type="button" onClick={store.dismissError}>
-            OK
-          </button>
-        </p>
-      )}
+    <div className="app" ref={appRef}>
+      <header className="topbar" ref={headerRef}>
+        <div className="topbar-inner">
+          <StarBadge className="logo" />
+          <p className="brand">
+            <span className="brand-1">MEZASTAR</span> <span className="brand-2">HELPER</span>
+          </p>
+          {MACHINE_SET && (
+            <span className="machine-chip">
+              <span aria-hidden="true">★</span> <span className="sr-only">Machine set:</span> {MACHINE_SET.name}
+            </span>
+          )}
+        </div>
+        {store.error && (
+          <p className="error banner" role="alert">
+            {store.error}{' '}
+            <button type="button" onClick={store.dismissError}>
+              OK
+            </button>
+          </p>
+        )}
+      </header>
       <main>
         {!store.loaded ? (
           <p>Loading…</p>
@@ -73,11 +106,15 @@ export function App() {
         )}
       </main>
       <nav className="tabbar" aria-label="Main">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const Icon = TAB_ICONS[t.id];
+          return (
+            <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
+              <Icon />
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );

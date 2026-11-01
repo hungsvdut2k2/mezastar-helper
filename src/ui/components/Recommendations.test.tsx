@@ -16,12 +16,23 @@ it('shows reminders, a team, its reason and a turn-by-turn plan', () => {
   expect(screen.getByText(/^Team 1:/)).toBeInTheDocument();
   expect(screen.getByText(/→ Lugia \(target\):/)).toBeInTheDocument(); // the reason line
   expect(screen.getByText('rule of thumb')).toBeInTheDocument();
-  expect(screen.getAllByText(/^Turn \d:/)).toHaveLength(3);
+  expect(screen.getAllByText(/^Turn \d$/)).toHaveLength(3);
+  // Each step reads as a turn timeline entry: "Turn 1 ▶ Attacker → Target", with its trust badge.
+  const step = screen.getAllByText(/^Turn \d$/)[0].closest('li')!;
+  expect(step).toHaveTextContent(/^Turn 1 ▶ .+ → .+/);
+  expect(step.querySelector('.trust')?.getAttribute('class')).toMatch(/^trust trust-(confirmed|community|player|open|estimate)$/);
 });
 
 it('asks for more tags when fewer than 2 are owned', () => {
   render(<Recommendations owned={[byId('1-3-002')]} battle={battle} />);
   expect(screen.getByText(/Mark at least 2 tags as owned/)).toBeInTheDocument();
+});
+
+it('shows each team member as a card', () => {
+  const { container } = render(<Recommendations owned={owned} battle={battle} photos={new Map([['1-3-002', 'blob:mine']])} />);
+  const team = container.querySelector('.card .team-grid')!;
+  expect(team.querySelectorAll('.tc-medium').length).toBeGreaterThanOrEqual(2);
+  expect(container.querySelector('img[src="blob:mine"]')).toHaveAttribute('alt', '');
 });
 
 it('lets the player pick the team they used', async () => {

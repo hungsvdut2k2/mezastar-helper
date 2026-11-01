@@ -1,4 +1,6 @@
 import type { Mechanic, OpenQuestion } from './types';
+import { SETS, setById } from './setInfo';
+import { TAGS } from './tags';
 
 const HOWTO = 'https://world.pokemonmezastar.com/sg/howto/';
 const BATTLE = `${HOWTO}battle.php`;
@@ -9,9 +11,24 @@ const DYNAMAX = `${HOWTO}dynamax.php`;
 const CHAIN = `${HOWTO}chain_attack.php`;
 const AFTER = `${HOWTO}after.php`;
 const ABOUT_TAG = `${HOWTO}about_tag.php`;
-const SET_PAGE = 'https://world.pokemonmezastar.com/sg/tag/33112/';
 const SET_LIST = 'https://kitakuji.id/blog/daftar-mezatag-pokemon-mezastar-stardust-version-3/';
 const BLOGS = 'Japanese player blogs';
+
+/** One lineup entry per set, built from the tag data so the list cannot drift from it. */
+function superstarsEntry(set: (typeof SETS)[number]): Mechanic[] {
+  const own = TAGS.filter((t) => t.id.startsWith(`${set.prefix}-`));
+  const stars = own.filter((t) => t.grade === 6);
+  const rest = own.filter((t) => t.grade === 5);
+  if (stars.length === 0) return [];
+  const range = (list: typeof own) => `${list[0].id} to ${list[list.length - 1].id}`;
+  return [{
+    id: `superstars-${set.id}`,
+    title: `${set.name} Superstars`,
+    trust: 'confirmed',
+    sources: [set.url],
+    explanation: `${stars.map((t) => t.name).join(', ')} (${range(stars)}). Stars are ${range(rest)}.`,
+  }];
+}
 
 export const MECHANICS: Mechanic[] = [
   { id: 'areas', title: 'Choosing an Area', trust: 'confirmed', sources: [BATTLE],
@@ -36,16 +53,19 @@ export const MECHANICS: Mechanic[] = [
     explanation: 'A crony you defeat joins you as a Support Pokémon and can still be caught at Catch Time. Defeating a crony you want to catch does not lose it.' },
   { id: 'support-ticket', title: 'Support Pokémon Ticket', trust: 'confirmed', sources: [TICKETS],
     explanation: 'A Support Pokémon Ticket (max 1 per battle) gives you a supporter from the start. Scan it before placing any tags.' },
-  { id: 'first-attack-moves', title: 'Special moves on the first attack', trust: 'confirmed', sources: [DYNAMAX, CHAIN, SET_LIST],
-    explanation: 'Special moves trigger on a Pokémon\'s first attack: Mega Evolution (1 chance per play), Dynamax (1 per battle), Z-Move (1 per play), Double Move, Chain Attack (up to 3 Pokémon in a row) and TAG Move (two Pokémon on one tag).' },
+  { id: 'first-attack-moves', title: 'Special moves on the first attack', trust: 'confirmed', sources: [DYNAMAX, CHAIN, SET_LIST, setById('galaxy-v2').url],
+    explanation: 'Special moves trigger on a Pokémon\'s first attack: Mega Evolution (1 chance per play), Dynamax (1 per battle), Z-Move (1 per play), Gigantamax and Double Move (Galaxy sets), Chain Attack (up to 3 Pokémon in a row) and TAG Move (two Pokémon on one tag). See the Gigantamax and Double Move entries for how the app treats them.' },
+  { id: 'gigantamax', title: 'Gigantamax', trust: 'community', sources: [setById('galaxy-v1').url, 'App assumption: the official pages state no limit'],
+    explanation: 'Gigantamax tags (Galaxy sets) are assumed to share the Dynamax once-per-battle limit and to be as strong as Dynamax. The official pages name the G-Max moves but state neither, so the app counts one Dynamax or Gigantamax per battle.' },
+  { id: 'double-move', title: 'Double Move', trust: 'community', sources: [setById('galaxy-v2').url, 'App assumption: the official pages name both moves but give no damage'],
+    explanation: 'A Double Move tag attacks with two moves on its first attack. The pages name both moves; the app models two hits, each worth half of a x1.8 total, each using its own move type against the opponent (so Raikou\'s Thunder is wasted on a Ground type but Crunch still lands). The x1.8 is an estimate.' },
   { id: 'everyone-attack', title: 'Everyone Attack!', trust: 'confirmed', sources: [BATTLE],
     explanation: '"Everyone Attack!" sometimes happens on the last turn. Slide all your tags forward; your Support Pokémon join in too.' },
   { id: 'catch-time', title: 'Catch Time', trust: 'confirmed', sources: [AFTER, BATTLE],
     explanation: 'Catch Time comes after 3 turns or as soon as you beat the Boss. You get one of the 3 opponents. Damage you dealt fills the Catch Gauge, then a Ball Roulette picks a Poké, Great, Ultra or Master Ball. A Bonus Catch Time (tall grass) can follow.' },
   { id: 'tag-info', title: 'What a tag tells you', trust: 'confirmed', sources: [ABOUT_TAG],
     explanation: 'Each tag shows its grade (2★ to 6★; 5★ is Star and 6★ is Superstar), type, Pokénergy, HP, Attack, Defense, Speed, move and move type.' },
-  { id: 'superstars-v3', title: 'Stardust V3 Superstars', trust: 'confirmed', sources: [SET_PAGE],
-    explanation: 'Lugia, Ho-Oh, Solgaleo, Lunala, Greninja, Zeraora, Eternatus, Keldeo, Grimmsnarl and Zygarde (1-3-001 to 1-3-010). Stars are 1-3-011 to 1-3-025.' },
+  ...SETS.flatMap(superstarsEntry),
   { id: 'machine-stock', title: 'Opponents come from the machine', trust: 'community', sources: [BLOGS],
     explanation: 'The opponents you see are tags physically stocked in that machine, so your Superstar chances depend on the machine.' },
   { id: 'special-tag-battle', title: 'Special Tag Battles', trust: 'community', sources: [BLOGS],

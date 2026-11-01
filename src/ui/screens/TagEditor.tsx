@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { GIMMICK_NAME, POKEMON_TYPES, type Grade, type PokemonType, type Tag, type TagCorrection, type TagStats } from '../../data/types';
+import { printedCode, setLabel } from '../../data/setInfo';
 import { gradeLabel, typeLabel } from '../format';
+import type { Rasterizer } from '../photo';
+import { PhotoSection } from './PhotoSection';
+import { TagCard } from '../components/TagCard';
 
 type Props = {
   /** The tag as the player currently sees it (shipped data plus any earlier correction). */
@@ -12,6 +16,13 @@ type Props = {
   onSave: (correction: TagCorrection | null) => void | Promise<void>;
   onReset: () => void | Promise<void>;
   onClose: () => void;
+  /** Object URL of the player's photo of this tag, if any. */
+  photoUrl?: string;
+  /** Receives the already-downscaled photo; resolves to true when stored. */
+  onSetPhoto?: (blob: Blob) => Promise<boolean>;
+  onRemovePhoto?: () => Promise<boolean>;
+  /** Replaces the canvas-based image decoder (tests). */
+  rasterizer?: Rasterizer;
 };
 
 const FIELDS = [
@@ -25,7 +36,7 @@ type Field = (typeof FIELDS)[number][0];
 
 const toText = (v: number | null) => (v === null ? '' : String(v));
 
-export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose }: Props) {
+export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClose, photoUrl, onSetPhoto, onRemovePhoto, rasterizer }: Props) {
   const [grade, setGrade] = useState(tag.grade === null ? '' : String(tag.grade));
   const [type1, setType1] = useState<PokemonType>(tag.types[0] ?? POKEMON_TYPES[0]);
   const [type2, setType2] = useState<string>(tag.types[1] ?? '');
@@ -42,8 +53,12 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
   const [saving, setSaving] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => heading.current?.focus(), []);
-
+  useEffect(() => {
+    // Focus for screen readers without letting the browser scroll the picture out of view.
+    const h = heading.current;
+    h?.focus({ preventScroll: true });
+    h?.closest('.tc')?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
   async function save() {
     const parsed = {} as Record<Field, number | null>;
     for (const [field, label] of FIELDS) {
@@ -92,20 +107,33 @@ export function TagEditor({ tag, shipped, hasCorrection, onSave, onReset, onClos
       <button type="button" className="link" onClick={onClose}>
         ‹ Back
       </button>
-      <h1 ref={heading} tabIndex={-1}>
-        {tag.name} <small>{tag.id}</small>
-      </h1>
+      <TagCard
+        as="div"
+        size="large"
+        tag={tag}
+        photoUrl={photoUrl}
+        meta={null}
+        title={
+          <h1 ref={heading} tabIndex={-1}>
+            {tag.name} <small>{printedCode(tag)}</small>
+          </h1>
+        }
+      />
       <p>
+        {setLabel(tag) && `${setLabel(tag)} · `}
         {gradeLabel(tag.grade)}
         {tag.gimmick && ` · ${GIMMICK_NAME[tag.gimmick.kind]}${tag.gimmick.moveName ? `: ${tag.gimmick.moveName}` : ''}`}
       </p>
+      {onSetPhoto && (
+        <PhotoSection tagName={tag.name} photoUrl={photoUrl} onSetPhoto={onSetPhoto} onRemovePhoto={onRemovePhoto} rasterizer={rasterizer} />
+      )}
       <p className="hint">Copy the numbers from the back of your tag. Leave a box empty if you don't know it.</p>
 
       <label>
         Grade
         <select value={grade} onChange={(e) => setGrade(e.target.value)}>
           <option value="">unknown</option>
-          {[2, 3, 4, 5, 6].map((g) => (
+          {[1, 2, 3, 4, 5, 6].map((g) => (
             <option key={g} value={g}>
               {g}★
             </option>

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isCustomId } from '../data/setInfo';
 import { TAGS } from '../data/tags';
-import type { PlayLogEntry, TagCorrection } from '../data/types';
+import type { PlayLogEntry, Tag, TagCorrection } from '../data/types';
+import { playsUsingTag } from '../engine/customTags';
 import { applyCorrections } from '../engine/corrections';
-import { restoreFromText, type ParseResult } from '../storage/backup';
+import { blobToDataUrl, restoreFromText, type ParseResult } from '../storage/backup';
 import * as db from '../storage/db';
 import type { AppData } from '../storage/db';
 
-const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [] };
+const BLOCKED_MESSAGE = 'Close other Mezastar Helper tabs, then reopen the app.';
+const EMPTY_DATA: AppData = { owned: [], corrections: {}, notes: {}, log: [], customTags: [] };
 
 type Pending = { newest: number; inflight: number; saved: PlayLogEntry | undefined };
 type Rollback = {
@@ -27,17 +30,58 @@ export function useAppData() {
     latest.current = next;
     setDataState(next);
   };
+  // Tag photos as object URLs. The ref is the truth (so URLs can be revoked); the state is a copy for rendering.
+  const photoUrls = useRef(new Map<string, string>());
+  const [photos, setPhotosState] = useState<Map<string, string>>(new Map());
+  const syncPhotos = () => setPhotosState(new Map(photoUrls.current));
+  // False once the app is gone: async work that finishes later must not leave object URLs behind.
+  const alive = useRef(false);
+  // Photo changes, custom-tag changes and restores run one after another, so the stored data and the screen
+  // cannot disagree about which of them happened last. A failed step never stops the ones queued behind it.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  function enqueue<T>(op: () => Promise<T>): Promise<T> {
+    const result = queue.current.then(op);
+    queue.current = result.catch(() => {});
+    return result;
+  }
+  /** Show exactly these photos; every previous object URL is revoked. */
+  const replacePhotoUrls = (blobs: Record<string, Blob>) => {
+    for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
+    photoUrls.current = alive.current ? new Map(Object.entries(blobs).map(([id, blob]) => [id, URL.createObjectURL(blob)])) : new Map();
+    if (alive.current) syncPhotos();
+  };
+  // True when the stored photos could not be read at startup, so how many there are is unknown.
+  const [photosLoadFailed, setPhotosLoadFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    db.loadAll()
-      .then(setData)
+    alive.current = true;
+    const stopBlockedWatch = db.onDbBlocked(() => setError(BLOCKED_MESSAGE));
+    Promise.all([db.loadAll(), db.getAllPhotos().catch(() => null)])
+      .then(([loadedData, blobs]) => {
+        if (!alive.current) return;
+        setData(loadedData);
+        replacePhotoUrls(blobs ?? {});
+        setPhotosLoadFailed(blobs === null);
+        // The upgrade was only waiting for another tab: all fine now.
+        setError((e) => (e === BLOCKED_MESSAGE ? null : e));
+      })
       .catch(() => setError('Could not open storage on this phone. Changes will not be saved.'))
       .finally(() => setLoaded(true));
+    // Let go of the object URLs when the app goes away.
+    return () => {
+      alive.current = false;
+      stopBlockedWatch();
+      for (const url of photoUrls.current.values()) URL.revokeObjectURL(url);
+      photoUrls.current.clear();
+    };
   }, []);
 
-  const tags = useMemo(() => applyCorrections(TAGS, data.corrections), [data.corrections]);
+  const tags = useMemo(
+    () => applyCorrections([...TAGS, ...data.customTags], data.corrections),
+    [data.customTags, data.corrections],
+  );
 
   // Per key with a rollback: the newest write, how many are still saving, and the last value known to be in storage.
   // An old failure never undoes a newer attempt; a failed newest write goes back to what is actually stored.
@@ -83,7 +127,88 @@ export function useAppData() {
     tags,
     loaded,
     error,
+    photos,
+    photosLoadFailed,
     dismissError: () => setError(null),
+    /** Save an already-processed photo. The picture appears once it is stored. */
+    async setPhoto(id: string, blob: Blob): Promise<boolean> {
+      return enqueue(async () => {
+        try {
+          await db.putPhoto(id, blob);
+        } catch {
+          if (alive.current) setError('Your photo was not saved.');
+          return false;
+        }
+        if (!alive.current) return true;
+        const old = photoUrls.current.get(id);
+        photoUrls.current.set(id, URL.createObjectURL(blob));
+        if (old) URL.revokeObjectURL(old);
+        syncPhotos();
+        return true;
+      });
+    },
+    async removePhoto(id: string): Promise<boolean> {
+      return enqueue(async () => {
+        try {
+          await db.deletePhoto(id);
+        } catch {
+          if (alive.current) setError('Your photo was not removed.');
+          return false;
+        }
+        if (!alive.current) return true;
+        const old = photoUrls.current.get(id);
+        photoUrls.current.delete(id);
+        if (old) URL.revokeObjectURL(old);
+        syncPhotos();
+        return true;
+      });
+    },
+    /** All stored photos as data URLs, for a backup file. */
+    async exportPhotos(): Promise<Record<string, string>> {
+      const blobs = await db.getAllPhotos();
+      const entries = await Promise.all(Object.entries(blobs).map(async ([id, b]) => [id, await blobToDataUrl(b)] as const));
+      return Object.fromEntries(entries);
+    },
+    /** Add or replace a player-made tag. Shown only once it is stored, so a failed save leaves no ghost tag. */
+    saveCustomTag(tag: Tag): Promise<boolean> {
+      return enqueue(async () => {
+        try {
+          await db.putCustomTag(tag);
+        } catch {
+          setError('Your tag was not saved.');
+          return false;
+        }
+        setData({
+          ...latest.current,
+          customTags: [...latest.current.customTags.filter((t) => t.id !== tag.id), tag].sort((a, b) => a.id.localeCompare(b.id)),
+        });
+        return true;
+      });
+    },
+    /** Delete a player-made tag with its owned flag, correction and photo. Refused while a saved play uses it. */
+    deleteCustomTag(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+      return enqueue(async () => {
+        const plays = playsUsingTag(latest.current.log, id);
+        if (plays > 0) return { ok: false as const, message: `Used in ${plays} saved ${plays === 1 ? 'play' : 'plays'} — can't delete.` };
+        try {
+          await db.deleteCustomTag(id);
+        } catch {
+          setError('Your tag was not deleted.');
+          return { ok: false as const, message: 'Could not delete this tag.' };
+        }
+        const d = latest.current;
+        const corrections = { ...d.corrections };
+        delete corrections[id];
+        setData({ ...d, customTags: d.customTags.filter((t) => t.id !== id), owned: d.owned.filter((o) => o !== id), corrections });
+        const url = photoUrls.current.get(id);
+        if (url) {
+          URL.revokeObjectURL(url);
+          photoUrls.current.delete(id);
+          if (alive.current) syncPhotos();
+        }
+        return { ok: true as const };
+      });
+    },
     toggleOwned(tagId: string) {
       const nowOwned = !latest.current.owned.includes(tagId);
       return write(
@@ -91,7 +216,13 @@ export function useAppData() {
           ...d,
           owned: nowOwned ? [...d.owned.filter((id) => id !== tagId), tagId] : d.owned.filter((id) => id !== tagId),
         }),
-        () => db.setOwned(tagId, nowOwned),
+        // Queued behind custom-tag deletes: a toggle that lands after its tag was deleted must not
+        // leave an owned flag for a tag that no longer exists.
+        () =>
+          enqueue(async () => {
+            if (isCustomId(tagId) && !latest.current.customTags.some((t) => t.id === tagId)) return;
+            await db.setOwned(tagId, nowOwned);
+          }),
       );
     },
     saveCorrection(tagId: string, correction: TagCorrection | null) {
@@ -123,14 +254,20 @@ export function useAppData() {
         logRollback(id, undefined),
       );
     },
-    async restore(text: string): Promise<ParseResult> {
-      try {
-        const result = await restoreFromText(text);
-        if (result.ok) setData(result.data);
-        return result;
-      } catch {
-        return { ok: false, error: 'Saving the restored data failed.' };
-      }
+    restore(text: string): Promise<ParseResult> {
+      return enqueue(async () => {
+        try {
+          const result = await restoreFromText(text);
+          if (result.ok) {
+            setData(result.data);
+            replacePhotoUrls(result.photos);
+            setPhotosLoadFailed(false);
+          }
+          return result;
+        } catch {
+          return { ok: false, error: 'Saving the restored data failed.' } as ParseResult;
+        }
+      });
     },
   };
 }

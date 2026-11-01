@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeBackup } from '../../storage/backup';
+import * as dbModule from '../../storage/db';
 import { addLogEntry, loadAll, setOwned } from '../../storage/db';
 import { localDate } from '../format';
 import { makeLogEntry } from '../../test/factories';
@@ -74,6 +75,7 @@ describe('restore', () => {
         corrections: {},
         notes: {},
         log: [makeLogEntry({ id: 'x' }), makeLogEntry({ id: 'y', date: '2026-09-01T12:00:00.000Z' })],
+        customTags: [],
       },
       new Date(2026, 8, 5, 12),
     );
@@ -96,6 +98,48 @@ describe('restore', () => {
       'This backup is from 2026-09-05: 2 plays, 3 owned tags. It will REPLACE your current 1 play and 1 owned tag.',
     );
     expect((await loadAll()).log.map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('says how many tag photos the restore replaces', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['a']), '1-3-002': new Blob(['b']) });
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
+    const backup = makeBackup(
+      { owned: [], corrections: {}, notes: {}, log: [], customTags: [] },
+      new Date(2026, 8, 5, 12),
+      { '1-3-003': `data:image/png;base64,${btoa('hello')}` },
+    );
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), new File([JSON.stringify(backup)], 'b.json', { type: 'application/json' }));
+    const group = await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(group).toHaveTextContent("It will replace your 2 tag photos with the backup's 1.");
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('warns loudly when the backup has no photos but the player has some', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['a']), '1-3-002': new Blob(['b']) });
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }));
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), backupFile());
+    const group = await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(group).toHaveTextContent("with the backup's 0.");
+    expect(screen.getByRole('alert')).toHaveTextContent('This backup has no photos — all 2 of your tag photos will be deleted.');
+  });
+
+  it('warns that photos may be deleted when they could not be read at startup', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockRejectedValue(new Error('unreadable'));
+    const user = userEvent.setup();
+    renderScreen();
+    await user.upload(await screen.findByLabelText('Restore from backup'), backupFile());
+    await screen.findByRole('group', { name: 'Confirm restore' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Your existing tag photos may be deleted.');
+    expect(screen.queryByText(/It will replace your 0 tag photos/)).not.toBeInTheDocument();
+  });
+
+  it('does not warn when there are no photos to lose', async () => {
+    await pickBackup();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('leaves the data unchanged on Cancel', async () => {
@@ -164,6 +208,30 @@ describe('backup', () => {
     const file = share.mock.calls[0][0].files![0];
     expect(file.name).toBe(`mezastar-backup-${localDate(new Date())}.json`);
     expect(file.type).toBe('application/json');
+  });
+
+  it('puts tag photos into the backup file and mentions it', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValue({ '1-3-001': new Blob(['hello'], { type: 'image/png' }) });
+    const share = vi.fn(async (_d: ShareData) => {});
+    stubNavigator(share);
+    const user = userEvent.setup();
+    renderScreen();
+    expect(await screen.findByText(/Backups include your tag photos/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save backup' }));
+    await screen.findByRole('status');
+    const text = await share.mock.calls[0][0].files![0].text();
+    expect(JSON.parse(text).photos).toEqual({ '1-3-001': `data:image/png;base64,${btoa('hello')}` });
+  });
+
+  it('stops with an error, and saves nothing, when the photos cannot be read for the backup', async () => {
+    vi.spyOn(dbModule, 'getAllPhotos').mockResolvedValueOnce({}).mockRejectedValue(new Error('x'));
+    const share = vi.fn(async (_d: ShareData) => {});
+    stubNavigator(share);
+    const user = userEvent.setup();
+    renderScreen();
+    await user.click(await screen.findByRole('button', { name: 'Save backup' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the backup: the tag photos could not be read.');
+    expect(share).not.toHaveBeenCalled();
   });
 
   it('treats closing the share sheet as a cancel, not an error', async () => {

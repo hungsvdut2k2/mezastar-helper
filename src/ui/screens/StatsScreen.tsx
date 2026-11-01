@@ -26,7 +26,7 @@ function Row({ label, value, testId }: { label: string; value: string | number; 
 }
 
 type Message = { kind: 'ok' | 'error'; text: string };
-type PendingRestore = { text: string; data: AppData; exportedAt: string | null };
+type PendingRestore = { text: string; data: AppData; photoCount: number; exportedAt: string | null };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
@@ -43,7 +43,14 @@ export function StatsScreen({ store }: { store: AppStore }) {
   const nameOf = (id: string | null) => store.tags.find((t) => t.id === id)?.name ?? 'nothing';
 
   async function backup() {
-    const json = JSON.stringify(makeBackup(store.data), null, 2);
+    let photos: Record<string, string>;
+    try {
+      photos = await store.exportPhotos();
+    } catch {
+      setMessage({ kind: 'error', text: 'Could not create the backup: the tag photos could not be read.' });
+      return;
+    }
+    const json = JSON.stringify(makeBackup(store.data, new Date(), photos), null, 2);
     const file = new File([json], `mezastar-backup-${localDate(new Date())}.json`, { type: 'application/json' });
     // On iPhone the share sheet has "Save to Files"; a plain download link is the fallback.
     if (navigator.canShare?.({ files: [file] })) {
@@ -99,7 +106,7 @@ export function StatsScreen({ store }: { store: AppStore }) {
     } catch {
       // parseBackup already accepted the text, so this cannot happen; keep the date unknown.
     }
-    setPending({ text, data: parsed.data, exportedAt });
+    setPending({ text, data: parsed.data, photoCount: Object.keys(parsed.photos).length, exportedAt });
   }
 
   async function replace() {
@@ -191,6 +198,7 @@ export function StatsScreen({ store }: { store: AppStore }) {
 
       <h2>Backup</h2>
       <p className="hint">Save a backup to Files or iCloud Drive now and then. Data lives only on this phone.</p>
+      <p className="hint">Backups include your tag photos, so the file may be larger.</p>
       <div className="actions">
         <button type="button" className="primary" onClick={backup}>
           Save backup
@@ -205,6 +213,19 @@ export function StatsScreen({ store }: { store: AppStore }) {
           <p>
             {`This backup is from ${pending.exportedAt ? localDate(pending.exportedAt) : 'an unknown date'}: ${plural(pending.data.log.length, 'play')}, ${plural(pending.data.owned.length, 'owned tag')}. It will REPLACE your current ${plural(store.data.log.length, 'play')} and ${plural(store.data.owned.length, 'owned tag')}.`}
           </p>
+          {!store.photosLoadFailed && (
+            <p>{`It will replace your ${plural(store.photos.size, 'tag photo')} with the backup's ${pending.photoCount}.`}</p>
+          )}
+          {store.photosLoadFailed && (
+            <p className="error" role="alert">
+              <strong>Your existing tag photos may be deleted.</strong>
+            </p>
+          )}
+          {pending.photoCount === 0 && store.photos.size > 0 && (
+            <p className="error" role="alert">
+              <strong>{`This backup has no photos — all ${store.photos.size} of your tag photos will be deleted.`}</strong>
+            </p>
+          )}
           <div className="actions">
             <button type="button" onClick={backup}>
               Save a backup of current data first

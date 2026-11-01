@@ -22,20 +22,57 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
+const NAVY = [11, 16, 32]; // #0b1020
+const GOLD = [255, 204, 51]; // #ffcc33
+const GOLD_SOFT = [255, 226, 122]; // #ffe27a
+const RED = [179, 18, 42]; // #b3122a
+
+/** Five-point star outline (point up) around (cx, cy). */
+function starPoints(cx, cy, outer, inner) {
+  return Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? outer : inner;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
+}
+
+/** Even-odd ray casting. */
+function inPolygon(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Colour at a point of the original star badge: gold rim, red disc, gold star, on navy. Everything stays inside the central 80% (maskable safe zone). */
+function badgeColor(x, y, size, star) {
+  const d2 = (x - size / 2) ** 2 + (y - size / 2) ** 2;
+  if (inPolygon(x, y, star)) return GOLD_SOFT;
+  if (d2 < (size * 0.33) ** 2) return RED;
+  if (d2 < (size * 0.39) ** 2) return GOLD;
+  return NAVY;
+}
+
 function png(size) {
   const rowBytes = size * 3 + 1;
   const raw = Buffer.alloc(size * rowBytes);
-  const r = size * 0.3;
-  const c = size / 2;
+  const star = starPoints(size / 2, size / 2 + size * 0.01, size * 0.25, size * 0.25 * 0.382);
+  const N = 3; // N x N samples per pixel for smooth edges
   for (let y = 0; y < size; y++) {
     raw[y * rowBytes] = 0; // no filter
     for (let x = 0; x < size; x++) {
-      const inside = (x - c) ** 2 + (y - c) ** 2 < r * r;
-      const [red, green, blue] = inside ? [255, 209, 102] : [29, 53, 87];
+      const sum = [0, 0, 0];
+      for (let sy = 0; sy < N; sy++) {
+        for (let sx = 0; sx < N; sx++) {
+          const c = badgeColor(x + (sx + 0.5) / N, y + (sy + 0.5) / N, size, star);
+          for (let k = 0; k < 3; k++) sum[k] += c[k];
+        }
+      }
       const o = y * rowBytes + 1 + x * 3;
-      raw[o] = red;
-      raw[o + 1] = green;
-      raw[o + 2] = blue;
+      for (let k = 0; k < 3; k++) raw[o + k] = Math.round(sum[k] / (N * N));
     }
   }
   const ihdr = Buffer.alloc(13);
