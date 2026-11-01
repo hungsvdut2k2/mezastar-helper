@@ -71,6 +71,15 @@ function reasonFor(team: Tag[], battle: Battle, unknown: boolean): string {
 }
 
 export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
+  const usesUnknownStats = [...team, ...battle.opponents].some(hasUnknownStats);
+  return { team, score: teamScoreValue(team, battle), reason: reasonFor(team, battle, usesUnknownStats), usesUnknownStats };
+}
+
+/**
+ * The number behind scoreTeam. Every opponent adds its own part (coverage, speed, resist, bulk);
+ * only the rotation check looks at the target. recommendOverCronies relies on this.
+ */
+export function teamScoreValue(team: Tag[], battle: Battle): number {
   let score = 0;
 
   // 1–2. Attack coverage and Speed
@@ -102,8 +111,7 @@ export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
     }
   }
 
-  const usesUnknownStats = [...team, ...battle.opponents].some(hasUnknownStats);
-  return { team, score, reason: reasonFor(team, battle, usesUnknownStats), usesUnknownStats };
+  return score;
 }
 
 function combinations<T>(items: T[], k: number): T[][] {
@@ -111,6 +119,23 @@ function combinations<T>(items: T[], k: number): T[][] {
   if (items.length < k) return [];
   const [first, ...rest] = items;
   return [...combinations(rest, k - 1).map((c) => [first, ...c]), ...combinations(rest, k)];
+}
+
+/**
+ * Like topTeams, but a team's score is its average over several possible battles (e.g. one per crony
+ * the set could field). The reason line and unknown-stats flag describe the `shown` battle.
+ */
+export function topTeamsOver(owned: Tag[], battles: Battle[], shown: Battle, count = 3): TeamScore[] {
+  const avg = (f: (b: Battle) => number) => battles.reduce((s, b) => s + f(b), 0) / battles.length;
+  const solo = new Map(owned.map((t) => [t, avg((b) => soloScore(t, b))]));
+  const pool = [...owned].sort((a, b) => solo.get(b)! - solo.get(a)! || a.id.localeCompare(b.id)).slice(0, WEIGHTS.poolSize);
+  const size = Math.min(3, pool.length);
+  if (size === 0 || battles.length === 0) return [];
+  return combinations(pool, size)
+    .map((team) => ({ team, score: avg((b) => teamScoreValue(team, b)) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, count)
+    .map(({ team, score }) => ({ ...scoreTeam(team, shown), score }));
 }
 
 export function topTeams(owned: Tag[], battle: Battle, count = 3): TeamScore[] {

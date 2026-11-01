@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import type { Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
-import { unknownOpponent } from '../../engine/recommend';
+import { cronyPool, unknownOpponent } from '../../engine/recommend';
 import { BestTeam } from '../components/BestTeam';
 import { Recommendations } from '../components/Recommendations';
 import { printedCode } from '../../data/setInfo';
@@ -39,6 +39,8 @@ export function PlanScreen({ store }: { store: AppStore }) {
         : null,
     [target, crony1, crony2],
   );
+  const pool = useMemo(() => (target ? cronyPool(target, store.tags) : undefined), [target, store.tags]);
+  const blankCrony = !crony1 || !crony2;
 
   return (
     <section>
@@ -71,7 +73,13 @@ export function PlanScreen({ store }: { store: AppStore }) {
         <TagPicker label="Crony 1 (optional)" tags={store.tags} value={crony1} onChange={setCrony1} cardSize="medium" photos={store.photos} />
         <TagPicker label="Crony 2 (optional)" tags={store.tags} value={crony2} onChange={setCrony2} cardSize="medium" photos={store.photos} />
       </div>
-      {battle && <Recommendations owned={owned} battle={battle} photos={store.photos} />}
+      {battle && blankCrony && (
+        <p className="hint">
+          Cronies are random. Teams are ranked by their average against every Pokémon from the same set that could fill a
+          blank crony slot. Fill a crony in to plan for it exactly.
+        </p>
+      )}
+      {battle && <Recommendations owned={owned} battle={battle} photos={store.photos} cronyPool={pool} />}
       {!target && <BestTeam tags={store.tags} ownedIds={store.data.owned} photos={store.photos} />}
     </section>
   );
