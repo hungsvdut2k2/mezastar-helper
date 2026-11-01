@@ -27,8 +27,13 @@ export type TagStats = {
   hp: number | null;
   attack: number | null;
   defense: number | null;
+  spAttack: number | null;
+  spDefense: number | null;
   speed: number | null;
 };
+
+/** Physical moves use Attack against Defense; special moves use Sp. Atk against Sp. Def. */
+export type MoveCategory = 'physical' | 'special';
 
 export type Tag = {
   /** Unique app-wide. The printed code (Regular Tags are R-1-n / R-2-n, one id per series; see setInfo.ts). */
@@ -40,7 +45,8 @@ export type Tag = {
   types: PokemonType[]; // 1 or 2
   pokenergy: number | null;
   stats: TagStats;
-  move: { name: string; type: PokemonType } | null;
+  /** category is missing when unknown; the engine then uses the tag's higher attacking stat. */
+  move: { name: string; type: PokemonType; category?: MoveCategory } | null;
   gimmick: {
     kind: Gimmick;
     moveName: string | null;

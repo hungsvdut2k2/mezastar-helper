@@ -38,6 +38,21 @@ it('offers grades 1 to 6 and saves a grade of 1 as a correction', async () => {
   expect(onSave).toHaveBeenCalledWith({ grade: 1 });
 });
 
+it('edits Sp. Atk, Sp. Def and whether the move is physical or special', async () => {
+  const onSave = vi.fn();
+  const { user } = setup({ onSave });
+  expect(screen.getByLabelText('Sp. Def')).toHaveValue(lugia.stats.spDefense);
+  expect(screen.getByLabelText('Move kind')).toHaveValue('special');
+  await user.clear(screen.getByLabelText('Sp. Atk'));
+  await user.type(screen.getByLabelText('Sp. Atk'), '120');
+  await user.selectOptions(screen.getByLabelText('Move kind'), 'physical');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  expect(onSave).toHaveBeenCalledWith({
+    stats: { spAttack: 120 },
+    move: { name: 'Aeroblast', type: 'flying', category: 'physical' },
+  });
+});
+
 it('offers Add photo, processes the file and hands over the blob', async () => {
   const { user, onSetPhoto } = setup();
   expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument();
@@ -120,4 +135,49 @@ it('moves focus to Add photo after the photo is removed', async () => {
   render(<Host />);
   await userEvent.setup().click(screen.getByRole('button', { name: 'Remove photo' }));
   await waitFor(() => expect(screen.getByLabelText('Add photo')).toHaveFocus());
+});
+
+describe('reading stats from a photo', () => {
+  it('is hidden without a reader', () => {
+    setup();
+    expect(screen.queryByLabelText('Scan a photo for stats')).not.toBeInTheDocument();
+  });
+
+  it('fills the boxes from a scanned photo without saving, then saves what the player confirms', async () => {
+    const onSave = vi.fn();
+    const readStats = vi.fn(async () => ({
+      grade: null,
+      pokenergy: 4,
+      hp: 210,
+      attack: 130,
+      defense: null,
+      spAttack: 140,
+      spDefense: null,
+      speed: 95,
+      move: { name: 'Aeroblast', type: 'flying' as const, category: 'special' as const },
+    }));
+    const { user } = setup({ onSave, readStats });
+    await user.upload(screen.getByLabelText('Scan a photo for stats'), picture());
+    expect(await screen.findByText('Filled 6 values from the photo. Check them, then Save.')).toBeInTheDocument();
+    expect(readStats).toHaveBeenCalledWith(jpeg);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('HP')).toHaveValue(210);
+    expect(screen.getByLabelText('Defense')).toHaveValue(lugia.stats.defense); // not read: left as it was
+    expect(screen.getByLabelText('Sp. Atk')).toHaveValue(140);
+    expect(screen.getByLabelText('Move')).toHaveValue('Aeroblast');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ pokenergy: 4, stats: { hp: 210, attack: 130, spAttack: 140, speed: 95 } }),
+    );
+  });
+
+  it('shows the reader error', async () => {
+    const { OcrError } = await import('../statsOcr');
+    const readStats = vi.fn(async () => {
+      throw new OcrError('No connection. Reading a photo needs the internet.');
+    });
+    const { user } = setup({ readStats });
+    await user.upload(screen.getByLabelText('Scan a photo for stats'), picture());
+    expect(await screen.findByRole('alert')).toHaveTextContent('No connection');
+  });
 });

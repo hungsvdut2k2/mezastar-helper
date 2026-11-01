@@ -32,3 +32,15 @@ it('offers the Superstars of the chosen set only, labelled with name and code', 
   expect(screen.getByRole('button', { name: 'Lugia 1-3-001' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Kyurem 1-4-008' })).toBeInTheDocument();
 });
+
+it('shows the best all-round team from Stardust V1–V3 until a target is picked, marking owned tags', async () => {
+  const user = userEvent.setup();
+  render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
+  expect(await screen.findByRole('heading', { name: 'Best all-round team' })).toBeInTheDocument();
+  expect(screen.getAllByText(/^Best team \d:/)).toHaveLength(3);
+  expect(screen.getAllByText(/^You own 0 of 3/).length).toBeGreaterThan(0);
+  await user.click(screen.getByRole('button', { name: 'Only my tags' }));
+  expect(screen.getByText(/Mark at least 2 Stardust V1–V3 tags/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Lugia 1-3-001' }));
+  expect(screen.queryByRole('heading', { name: 'Best all-round team' })).not.toBeInTheDocument();
+});

@@ -248,13 +248,14 @@ details[open] > summary::before { transform: rotate(90deg); }
 .tc-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .type-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--t, var(--surface-3)); color: var(--t-ink, var(--text)); font-size: 0.7rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.5; }
 .tc-gimmick { display: inline-block; padding: 1px 8px; border-radius: 999px; background: linear-gradient(90deg, #b0124f, #5b3cc4); color: #ffffff; font-size: 0.7rem; font-weight: 900; line-height: 1.5; overflow-wrap: anywhere; }
-.tc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-.tc-medium .tc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.tc-medium .tc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; }
 .tc-stat { display: flex; justify-content: space-between; gap: 4px; padding: 2px 6px; border-radius: 6px; background: var(--bg-deep); font-size: 0.75rem; }
 .tc-stat-k { color: var(--muted); font-weight: 800; font-size: 0.7rem; letter-spacing: 0.03em; }
 .tc-stat-v { font-weight: 900; font-variant-numeric: tabular-nums; }
 .tc-move { font-size: 0.8rem; overflow-wrap: anywhere; }
 .tc-move .tc-stat-k { margin-right: 4px; }
+.tc-move-cat { color: var(--muted); }
 .tc-move-dot { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 50%; background: var(--t, var(--muted)); vertical-align: -1px; }
 /* small: a row with a square thumbnail */
 .tc-small { flex-direction: row; align-items: stretch; }

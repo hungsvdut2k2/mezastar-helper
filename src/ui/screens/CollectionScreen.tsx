@@ -8,6 +8,9 @@ import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setCho
 import type { AppStore } from '../useAppData';
 import { CustomTagForm } from './CustomTagForm';
 import { TagEditor } from './TagEditor';
+import { geminiReader } from '../statsOcr';
+
+const readStats = geminiReader();
 
 type Filter = 'all' | 'owned' | 'missing';
 const FILTERS: { id: Filter; label: string }[] = [
@@ -103,6 +106,7 @@ export function CollectionScreen({ store }: { store: AppStore }) {
         photoUrl={store.photos.get(editing.id)}
         onSetPhoto={(blob) => store.setPhoto(editing.id, blob)}
         onRemovePhoto={() => store.removePhoto(editing.id)}
+        readStats={readStats}
       />
     );
   }

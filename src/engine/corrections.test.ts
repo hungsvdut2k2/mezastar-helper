@@ -4,9 +4,9 @@ import { applyCorrections } from './corrections';
 describe('applyCorrections', () => {
   it('overrides only the corrected fields and marks the source', () => {
     const [lugia] = applyCorrections(TAGS, { '1-3-001': { stats: { attack: 150 } } });
-    expect(lugia.stats).toEqual({ hp: null, attack: 150, defense: null, speed: null });
+    expect(lugia.stats).toEqual({ ...TAGS[0].stats, attack: 150 });
     expect(lugia.types).toEqual(['psychic', 'flying']);
-    expect(lugia.move).toEqual({ name: 'Aeroblast', type: 'flying' });
+    expect(lugia.move).toEqual({ name: 'Aeroblast', type: 'flying', category: 'special' });
     expect(lugia.sources).toContain('player correction');
   });
 

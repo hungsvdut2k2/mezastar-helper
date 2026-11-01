@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import type { Tag } from '../../data/types';
 import type { Battle } from '../../engine/battleModel';
 import { unknownOpponent } from '../../engine/recommend';
+import { BestTeam } from '../components/BestTeam';
 import { Recommendations } from '../components/Recommendations';
 import { printedCode } from '../../data/setInfo';
 import { typeVars } from '../components/TagCard';
@@ -71,6 +72,7 @@ export function PlanScreen({ store }: { store: AppStore }) {
         <TagPicker label="Crony 2 (optional)" tags={store.tags} value={crony2} onChange={setCrony2} cardSize="medium" photos={store.photos} />
       </div>
       {battle && <Recommendations owned={owned} battle={battle} photos={store.photos} />}
+      {!target && <BestTeam tags={store.tags} ownedIds={store.data.owned} photos={store.photos} />}
     </section>
   );
 }

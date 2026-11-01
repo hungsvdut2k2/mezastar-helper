@@ -1,7 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { printedCode, setLabel } from '../../data/setInfo';
 import { GIMMICK_NAME, type PokemonType, type Tag } from '../../data/types';
-import { gradeLabel, typeLabel } from '../format';
+import { categoryLabel, gradeLabel, typeLabel } from '../format';
 import { SmallStar } from './icons';
 import { TypeGlyph } from './TypeGlyph';
 
@@ -34,6 +34,8 @@ const STAT_LABELS = [
   ['hp', 'HP'],
   ['attack', 'ATK'],
   ['defense', 'DEF'],
+  ['spAttack', 'SPA'],
+  ['spDefense', 'SPD'],
   ['speed', 'SPE'],
 ] as const;
 
@@ -149,6 +151,7 @@ export function TagCard({ tag, size, photoUrl, name, meta, title, as = 'span', c
                 <>
                   <span className="tc-move-dot" style={typeVars(tag.move.type) as CSSProperties} aria-hidden="true" />
                   {tag.move.name}
+                  {tag.move.category && <span className="tc-move-cat">{` · ${categoryLabel(tag.move.category)}`}</span>}
                 </>
               ) : (
                 '?'

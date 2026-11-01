@@ -17,7 +17,7 @@ export function unknownOpponent(slot: 1 | 2): Tag {
     grade: null,
     types: [],
     pokenergy: null,
-    stats: { hp: null, attack: null, defense: null, speed: null },
+    stats: { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null },
     move: null,
     gimmick: null,
     legendary: false,

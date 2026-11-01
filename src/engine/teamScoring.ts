@@ -1,5 +1,5 @@
 import type { Gimmick, Tag } from '../data/types';
-import { attackType, LIMITED_GIMMICKS, limitKey, statOrNeutral, type Battle } from './battleModel';
+import { attackOf, attackType, defenseAgainst, defenseFactor, LIMITED_GIMMICKS, limitKey, MODEL, statOrNeutral, type Battle } from './battleModel';
 import { effectiveness, effectText } from './typeEffectiveness';
 
 /** Fixed weights for version 1. */
@@ -10,7 +10,7 @@ export const WEIGHTS = {
   rotationPenalty: 60, // fewer than 2 good attackers on the target
   goodAttackerShare: 0.75, // "good" = at least 75% of the best hit on the target
   resist: 10, // per opponent move type the tag resists
-  bulkDivisor: 20, // (HP + Defense) / bulkDivisor
+  bulkDivisor: 20, // (HP + the Defense or Sp. Def the opponents hit) / bulkDivisor
   gimmick: 25, // first-attack special move
   poolSize: 15, // tags kept before trying combinations
 };
@@ -19,8 +19,23 @@ export type TeamScore = { team: Tag[]; score: number; reason: string; usesUnknow
 
 const weightOf = (battle: Battle, i: number) => (i === battle.targetIndex ? WEIGHTS.target : WEIGHTS.crony);
 
+/** Defense factor of an average opponent, so hitPower stays on the Attack scale. */
+const NEUTRAL_DEFENSE_FACTOR = 1 + MODEL.neutralStat / MODEL.defenseScale;
+
+/**
+ * How hard a tag's normal move hits an opponent: Attack (or Sp. Atk for special moves) times type
+ * effectiveness, scaled by the opponent's Defense (or Sp. Def) against an average one.
+ */
 export function hitPower(tag: Tag, opp: Tag): number {
-  return statOrNeutral(tag.stats.attack) * effectiveness(attackType(tag, false), opp.types);
+  const scale = NEUTRAL_DEFENSE_FACTOR / defenseFactor(opp, tag);
+  return statOrNeutral(attackOf(tag)) * effectiveness(attackType(tag, false), opp.types) * scale;
+}
+
+/** HP plus the tag's average Defense / Sp. Def against how the given opponents attack. */
+export function bulk(tag: Tag, opponents: readonly Tag[], weights: readonly number[] = opponents.map(() => 1)): number {
+  const total = weights.reduce((a, b) => a + b, 0);
+  const guard = total > 0 ? opponents.reduce((s, o, i) => s + weights[i] * statOrNeutral(defenseAgainst(tag, o)), 0) / total : MODEL.neutralStat;
+  return statOrNeutral(tag.stats.hp) + guard;
 }
 
 function soloScore(tag: Tag, battle: Battle): number {
@@ -79,7 +94,7 @@ export function scoreTeam(team: Tag[], battle: Battle): TeamScore {
   const limitedSeen = new Set<Gimmick>();
   for (const t of team) {
     for (const opp of battle.opponents) score += WEIGHTS.resist * (1 - effectiveness(attackType(opp, false), t.types));
-    score += (statOrNeutral(t.stats.hp) + statOrNeutral(t.stats.defense)) / WEIGHTS.bulkDivisor;
+    score += bulk(t, battle.opponents) / WEIGHTS.bulkDivisor;
     const kind = t.gimmick?.kind;
     if (kind && !limitedSeen.has(limitKey(kind))) {
       score += WEIGHTS.gimmick;
