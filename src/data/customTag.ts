@@ -38,7 +38,7 @@ export function makeCustomTag(id: string, input: CustomTagInput): Tag {
     grade: input.grade,
     types: input.types,
     pokenergy: null,
-    stats: { hp: null, attack: null, defense: null, speed: null },
+    stats: { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null },
     move: input.move ? { name: input.move.name.trim(), type: input.move.type } : null,
     gimmick: input.gimmick ? { kind: input.gimmick, moveName: null, moveType: null } : null,
     legendary: input.legendary,

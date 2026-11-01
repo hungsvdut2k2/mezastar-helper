@@ -1,4 +1,5 @@
-import { TAGS } from './tags';
+import { COMMUNITY_STATS, COMMUNITY_STATS_SOURCE } from './communityStats';
+import { TAGS, withCommunityStats } from './tags';
 import { CUSTOM_ID_PATTERN, newCustomId } from './customTag';
 import { SETS, isInSet, setLabel, setsOfTag, setsOfTagId } from './setInfo';
 import { GIMMICKS, POKEMON_TYPES } from './types';
@@ -55,12 +56,14 @@ describe('all sets', () => {
     expect(TAGS.find((t) => t.id === '1-1-009')?.types).toEqual(['fire', 'flying']);
   });
 
-  it('has 10 Superstars and 15 Stars in every set, grade-unknown for the rest', () => {
+  it('has 10 Superstars and 15 Stars in every set; other numbered tags are graded only where community stats exist', () => {
     for (const s of SETS) {
       const tags = inSet(s.id);
       expect(tags.filter((t) => t.grade === 6)).toHaveLength(10);
       expect(tags.filter((t) => t.grade === 5)).toHaveLength(15);
-      expect(tags.filter((t) => t.grade === null).length).toBe(tags.length - 25);
+      const numbered = tags.filter((t) => !t.id.startsWith('R-'));
+      const ungraded = numbered.filter((t) => t.grade === null).length;
+      expect(ungraded).toBe(numbered.some((t) => COMMUNITY_STATS[t.id]) ? 0 : numbered.length - 25);
     }
   });
 });
@@ -104,11 +107,46 @@ describe('Stardust V3 tags', () => {
     }
   });
 
-  it('never invents stats', () => {
+  it('never invents stats: they come from the community data or stay unknown', () => {
     for (const t of TAGS) {
-      expect(Object.values(t.stats).every((v) => v === null)).toBe(true);
-      expect(t.pokenergy).toBeNull();
+      const row = COMMUNITY_STATS[t.id];
+      if (row) {
+        const [, pokenergy, hp, attack, defense, spAttack, spDefense, speed] = row;
+        expect(t.stats).toEqual({ hp, attack, defense, spAttack, spDefense, speed });
+        expect(t.pokenergy).toBe(pokenergy);
+        expect(t.sources).toContain(COMMUNITY_STATS_SOURCE);
+      } else {
+        expect(Object.values(t.stats).every((v) => v === null)).toBe(true);
+        expect(t.pokenergy).toBeNull();
+      }
     }
+  });
+
+  it('has community stats for every Stardust V1–V4 and Galaxy V1 tag, but not Galaxy V2/V3', () => {
+    for (const s of ['stardust-v1', 'stardust-v2', 'stardust-v3', 'stardust-v4', 'galaxy-v1']) {
+      expect(inSet(s).every((t) => t.stats.attack !== null && t.move !== null)).toBe(true);
+    }
+    for (const s of ['galaxy-v2', 'galaxy-v3']) {
+      expect(inSet(s).filter((t) => !t.id.startsWith('R-')).every((t) => t.stats.attack === null)).toBe(true);
+    }
+    expect(TAGS.find((t) => t.id === '1-3-001')?.stats).toEqual({ hp: 175, attack: 100, defense: 142, spAttack: 100, spDefense: 168, speed: 121 });
+    expect(TAGS.find((t) => t.id === '1-3-001')?.move).toEqual({ name: 'Aeroblast', type: 'flying', category: 'special' });
+  });
+
+  it('keeps official grades and moves over community data', () => {
+    const fake = { ...TAGS[0], id: '1-3-001', grade: 5 as const, move: { name: 'Official', type: 'fire' as const }, stats: { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null } };
+    const merged = withCommunityStats(fake);
+    expect(merged.grade).toBe(5);
+    expect(merged.move).toEqual({ name: 'Official', type: 'fire' });
+    expect(merged.stats.hp).toBe(175);
+  });
+
+  it('takes the community move category only when the official move is the same move', () => {
+    const blank = { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null };
+    const same = withCommunityStats({ ...TAGS[0], id: '1-3-001', move: { name: 'aeroblast', type: 'flying' as const }, stats: blank });
+    expect(same.move?.category).toBe('special');
+    const other = withCommunityStats({ ...TAGS[0], id: '1-3-001', move: { name: 'Gust', type: 'flying' as const }, stats: blank });
+    expect(other.move?.category).toBeUndefined();
   });
 });
 

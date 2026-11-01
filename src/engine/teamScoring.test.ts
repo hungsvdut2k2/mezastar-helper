@@ -14,9 +14,27 @@ const grassBossWaterCronies: Battle = {
 };
 
 describe('hitPower', () => {
-  it('is Attack × effectiveness of the move type', () => {
-    expect(hitPower(fire, grassBossWaterCronies.opponents[0])).toBe(200);
-    expect(hitPower(water, grassBossWaterCronies.opponents[0])).toBe(50);
+  const average = makeTag('average', { types: ['grass'], stats: { defense: 100, spDefense: 100 } });
+
+  it('is Attack × effectiveness of the move type against an average opponent', () => {
+    expect(hitPower(fire, average)).toBe(200);
+    expect(hitPower(water, average)).toBe(50);
+  });
+
+  it('scales with the Defense the move hits: an opponent with no Defense takes 1.5×', () => {
+    expect(hitPower(fire, grassBossWaterCronies.opponents[0])).toBe(300);
+  });
+
+  it('uses Sp. Atk against Sp. Def for special moves', () => {
+    const special = makeTag('sp', { move: { name: 'Shadow Ball', type: 'ghost', category: 'special' }, stats: { attack: 50, spAttack: 150 } });
+    expect(hitPower(special, makeTag('o', { types: ['fire'], stats: { defense: 300, spDefense: 100 } }))).toBe(150);
+    expect(hitPower(special, makeTag('o', { types: ['fire'], stats: { defense: 100, spDefense: 300 } }))).toBe(90);
+  });
+
+  it('uses the higher attacking stat when the move category is unknown', () => {
+    const unknown = (attack: number, spAttack: number) => makeTag('u', { move: { name: 'Hit', type: 'normal' }, stats: { attack, spAttack } });
+    expect(hitPower(unknown(60, 140), average)).toBe(140);
+    expect(hitPower(unknown(140, 60), average)).toBe(140);
   });
 });
 
@@ -51,7 +69,7 @@ describe('scoreTeam', () => {
   it('applies the rotation penalty when no tag can hit the target at all', () => {
     const ghostBoss = makeTag('boss', { types: ['ghost'] });
     const team = [makeTag('n1'), makeTag('n2')];
-    const cronies = [makeTag('c1'), makeTag('c2')] as const;
+    const cronies = [makeTag('c1', { stats: { defense: 100 } }), makeTag('c2', { stats: { defense: 100 } })] as const;
     const bossTarget = scoreTeam(team, { opponents: [ghostBoss, ...cronies], targetIndex: 0 }).score;
     const cronyTarget = scoreTeam(team, { opponents: [ghostBoss, ...cronies], targetIndex: 1 }).score;
     // Coverage moves 100 points (the crony counts double instead of the Ghost Boss); the rest is the penalty.

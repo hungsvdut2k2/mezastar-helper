@@ -52,8 +52,9 @@ describe('backup', () => {
 
     it('accepts valid partial corrections and a full log entry', () => {
       const corrections = {
-        a: { grade: null, types: ['fire', 'water'], pokenergy: 0, stats: { attack: 150, hp: null }, move: null },
+        a: { grade: null, types: ['fire', 'water'], pokenergy: 0, stats: { attack: 150, hp: null, spAttack: 90, spDefense: null }, move: null },
         b: { move: { name: 'Tackle', type: 'normal' } },
+        d: { move: { name: 'Shadow Ball', type: 'ghost', category: 'special' } },
         c: {},
       };
       const entry = makeLogEntry({ turns: [{ attacker: 'x', aimedAt: 'y', defeated: 'y', predictedDefeat: true }] });
@@ -79,6 +80,7 @@ describe('backup', () => {
       ['move without name', { move: { type: 'fire' } }],
       ['move unknown type', { move: { name: 'X', type: 'sparkle' } }],
       ['move not an object', { move: 'Tackle' }],
+      ['move unknown category', { move: { name: 'X', type: 'fire', category: 'status' } }],
     ])('rejects a correction with %s', (_name, bad) => {
       const result = parseBackup(wrap({ corrections: { a: bad } }));
       expect(result.ok).toBe(false);
@@ -184,7 +186,7 @@ describe('custom tags in backups', () => {
     grade: 3,
     types: ['fire', 'water'],
     pokenergy: null,
-    stats: { hp: null, attack: null, defense: null, speed: null },
+    stats: { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null },
     move: { name: 'Zap', type: 'electric' },
     gimmick: { kind: 'mega', moveName: null, moveType: null },
     legendary: false,

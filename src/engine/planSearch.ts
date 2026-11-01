@@ -5,6 +5,7 @@ import {
   damage,
   MODEL,
   simulate,
+  attackOf,
   statOrNeutral,
   type Battle,
   type SimResult,
@@ -88,7 +89,7 @@ function comparePlans(a: Found, b: Found, battle: Battle): number {
 
 export function hasKeyStats(team: Tag[], battle: Battle): boolean {
   return (
-    team.every((t) => t.stats.attack !== null && t.stats.hp !== null && t.stats.speed !== null) &&
+    team.every((t) => attackOf(t) !== null && t.stats.hp !== null && t.stats.speed !== null) &&
     battle.opponents.every((o) => o.stats.hp !== null)
   );
 }

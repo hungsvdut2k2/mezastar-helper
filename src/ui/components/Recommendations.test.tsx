@@ -7,14 +7,15 @@ import { makeTag } from '../../test/factories';
 import { Recommendations } from './Recommendations';
 
 const byId = (id: string) => TAGS.find((t) => t.id === id)!;
-const battle: Battle = { opponents: [byId('1-3-001'), byId('1-3-017'), byId('1-3-041')], targetIndex: 0 };
-const owned = ['1-3-002', '1-3-008', '1-3-012'].map(byId);
+// Galaxy V2 has no stats yet, so these plans fall back to the rule of thumb.
+const battle: Battle = { opponents: [byId('2-2-001'), byId('2-2-031'), byId('2-2-032')], targetIndex: 0 };
+const owned = ['2-2-002', '2-2-012', '2-2-015'].map(byId);
 
 it('shows reminders, a team, its reason and a turn-by-turn plan', () => {
   render(<Recommendations owned={owned} battle={battle} />);
   expect(screen.getByText(/Scan it before placing any tags/)).toBeInTheDocument();
   expect(screen.getByText(/^Team 1:/)).toBeInTheDocument();
-  expect(screen.getByText(/→ Lugia \(target\):/)).toBeInTheDocument(); // the reason line
+  expect(screen.getByText(/→ Zacian \(target\):/)).toBeInTheDocument(); // the reason line
   expect(screen.getByText('rule of thumb')).toBeInTheDocument();
   expect(screen.getAllByText(/^Turn \d$/)).toHaveLength(3);
   // Each step reads as a turn timeline entry: "Turn 1 ▶ Attacker → Target", with its trust badge.
@@ -24,12 +25,12 @@ it('shows reminders, a team, its reason and a turn-by-turn plan', () => {
 });
 
 it('asks for more tags when fewer than 2 are owned', () => {
-  render(<Recommendations owned={[byId('1-3-002')]} battle={battle} />);
+  render(<Recommendations owned={[byId('2-2-002')]} battle={battle} />);
   expect(screen.getByText(/Mark at least 2 tags as owned/)).toBeInTheDocument();
 });
 
 it('shows each team member as a card', () => {
-  const { container } = render(<Recommendations owned={owned} battle={battle} photos={new Map([['1-3-002', 'blob:mine']])} />);
+  const { container } = render(<Recommendations owned={owned} battle={battle} photos={new Map([['2-2-002', 'blob:mine']])} />);
   const team = container.querySelector('.card .team-grid')!;
   expect(team.querySelectorAll('.tc-medium').length).toBeGreaterThanOrEqual(2);
   expect(container.querySelector('img[src="blob:mine"]')).toHaveAttribute('alt', '');

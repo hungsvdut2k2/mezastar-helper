@@ -66,14 +66,15 @@ it('can show a custom name and meta line, moving the grade to the badges', () =>
 
 it('shows stats when known and ? otherwise, plus move and gimmick, on larger cards', () => {
   const tag = makeTag('x', {
-    stats: { defense: null },
-    move: { name: 'Tackle', type: 'normal' },
+    stats: { defense: null, spDefense: null },
+    move: { name: 'Tackle', type: 'normal', category: 'physical' },
     gimmick: { kind: 'zmove', moveName: 'Big Hit', moveType: 'normal' },
   });
   const { container, rerender } = render(<TagCard tag={tag} size="large" />);
   const stats = [...container.querySelectorAll('.tc-stat')].map((s) => s.textContent?.trim());
-  expect(stats).toEqual(['HP 1000', 'ATK 100', 'DEF ?', 'SPE 100']);
+  expect(stats).toEqual(['HP 1000', 'ATK 100', 'DEF ?', 'SPA 100', 'SPD ?', 'SPE 100']);
   expect(screen.getByText('Tackle')).toBeInTheDocument();
+  expect(screen.getByText('· Physical')).toBeInTheDocument();
   expect(screen.getByText('Z-Move: Big Hit')).toBeInTheDocument();
   rerender(<TagCard tag={tag} size="small" />);
   expect(container.querySelector('.tc-stats')).not.toBeInTheDocument();

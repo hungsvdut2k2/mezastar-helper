@@ -1,4 +1,4 @@
-import type { Gimmick, PokemonType, Tag } from '../data/types';
+import type { Gimmick, MoveCategory, PokemonType, Tag } from '../data/types';
 import { effectiveness } from './typeEffectiveness';
 
 /** Id prefix of the stand-in crony; unknownOpponent() is the only place that builds such an id. */
@@ -9,8 +9,8 @@ export const isUnknownOpponent = (t: Tag) => t.id.startsWith(UNKNOWN_PREFIX);
 
 /** Placeholder constants. Measure with the play log before changing them. */
 export const MODEL = {
-  neutralStat: 100, // stands in for any unknown HP / Attack / Defense / Speed
-  defenseScale: 200, // defense factor = 1 + Defense / defenseScale
+  neutralStat: 100, // stands in for any unknown HP / Attack / Defense / Sp. Atk / Sp. Def / Speed
+  defenseScale: 200, // defense factor = 1 + Defense (or Sp. Def) / defenseScale
   supporterBonus: 30, // expected extra damage per supporter per turn
   gimmickMultiplier: {
     mega: 1.5,
@@ -71,6 +71,28 @@ export function attackType(tag: Tag, useGimmick: boolean): PokemonType | null {
   return tag.move?.type ?? tag.types[0] ?? null;
 }
 
+/**
+ * Physical or special. A move with no known category counts as whichever attacking stat is higher
+ * (physical on a tie or when both are unknown). Special moves (Mega, Z-Move…) are assumed to share
+ * the category of the tag's own move; the sources don't say otherwise.
+ */
+export function moveCategory(tag: Tag): MoveCategory {
+  if (tag.move?.category) return tag.move.category;
+  const { attack, spAttack } = tag.stats;
+  return spAttack !== null && (attack === null || spAttack > attack) ? 'special' : 'physical';
+}
+
+/** Attack for physical movers, Sp. Atk for special ones. null when unknown. */
+export const attackOf = (tag: Tag): number | null => (moveCategory(tag) === 'special' ? tag.stats.spAttack : tag.stats.attack);
+
+/** The defender's Defense against a physical attacker, Sp. Def against a special one. null when unknown. */
+export const defenseAgainst = (defender: Tag, attacker: Tag): number | null =>
+  moveCategory(attacker) === 'special' ? defender.stats.spDefense : defender.stats.defense;
+
+/** How much the defender's Defense or Sp. Def divides the attacker's hit. */
+export const defenseFactor = (defender: Tag, attacker: Tag): number =>
+  1 + statOrNeutral(defenseAgainst(defender, attacker)) / MODEL.defenseScale;
+
 export function damage(attacker: Tag, defender: Tag, useGimmick: boolean): number {
   const multiplier = useGimmick && attacker.gimmick ? MODEL.gimmickMultiplier[attacker.gimmick.kind] : 1;
   // A Double Move is two hits, each worth half of the total, each with its own type effectiveness.
@@ -78,8 +100,7 @@ export function damage(attacker: Tag, defender: Tag, useGimmick: boolean): numbe
   const eff = double
     ? (effectiveness(double[0], defender.types) + effectiveness(double[1], defender.types)) / 2
     : effectiveness(attackType(attacker, useGimmick), defender.types);
-  const defenseFactor = 1 + statOrNeutral(defender.stats.defense) / MODEL.defenseScale;
-  return (statOrNeutral(attacker.stats.attack) * eff * multiplier) / defenseFactor;
+  return (statOrNeutral(attackOf(attacker)) * eff * multiplier) / defenseFactor(defender, attacker);
 }
 
 export function attacksFirst(attacker: Tag, defender: Tag): boolean {

@@ -100,6 +100,8 @@ it('uses a correction made in Collection for the opponents already picked on Pla
   }
   await saveCorrection('1-3-017', { stats: { hp: 400 } });
   await saveCorrection('1-3-041', { stats: { hp: 300 } });
+  // Lugia's HP unknown, so the plan falls back to the rule of thumb until it is corrected.
+  await saveCorrection('1-3-001', { stats: { hp: null } });
   const user = userEvent.setup();
   render(<App />);
   await screen.findByRole('heading', { level: 1, name: 'Play' });

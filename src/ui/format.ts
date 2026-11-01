@@ -1,8 +1,10 @@
-import type { Grade, PokemonType, Tag, Trust } from '../data/types';
+import type { Grade, MoveCategory, PokemonType, Tag, Trust } from '../data/types';
 
 export const gradeLabel = (g: Grade | null) => (g === null ? 'grade unknown' : `${g}★`);
 
 export const typeLabel = (t: PokemonType) => t[0].toUpperCase() + t.slice(1);
+
+export const categoryLabel = (c: MoveCategory) => (c === 'special' ? 'Special' : 'Physical');
 
 export const TRUST_LABEL: Record<Trust, string> = {
   confirmed: 'Official',

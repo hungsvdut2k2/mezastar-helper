@@ -85,7 +85,8 @@ const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every
 /** A field that may be missing entirely. */
 const optional = (v: unknown, check: (x: unknown) => boolean) => v === undefined || check(v);
 
-const STAT_KEYS = ['hp', 'attack', 'defense', 'speed'];
+const MOVE_CATEGORIES = ['physical', 'special'];
+const STAT_KEYS = ['hp', 'attack', 'defense', 'spAttack', 'spDefense', 'speed'];
 
 function isCorrection(v: unknown): v is TagCorrection {
   if (!isObject(v)) return false;
@@ -98,7 +99,7 @@ function isCorrection(v: unknown): v is TagCorrection {
       stats,
       (s) => isObject(s) && Object.keys(s).every((k) => STAT_KEYS.includes(k)) && STAT_KEYS.every((k) => optional(s[k], (x) => x === null || isCount(x))),
     ) &&
-    optional(move, (m) => m === null || (isObject(m) && isString(m.name) && isType(m.type)))
+    optional(move, (m) => m === null || (isObject(m) && isString(m.name) && isType(m.type) && optional(m.category, isOneOf(MOVE_CATEGORIES))))
   );
 }
 
@@ -156,7 +157,7 @@ function parseCustomTag(v: unknown): Tag | null {
     grade: grade as Grade | null,
     types,
     pokenergy: null,
-    stats: { hp: null, attack: null, defense: null, speed: null },
+    stats: { hp: null, attack: null, defense: null, spAttack: null, spDefense: null, speed: null },
     move: move === null ? null : { name: (move as { name: string }).name, type: (move as { type: PokemonType }).type },
     gimmick: gimmick === null ? null : { kind: (gimmick as { kind: Gimmick }).kind, moveName: null, moveType: null },
     legendary,

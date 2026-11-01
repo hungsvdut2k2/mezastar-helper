@@ -138,6 +138,7 @@ it('saves a correction from the back of the tag', async () => {
   const user = userEvent.setup();
   renderScreen();
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.clear(screen.getByLabelText('Attack'));
   await user.type(screen.getByLabelText('Attack'), '150');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
@@ -149,6 +150,7 @@ it('stores only the fields that differ from the shipped tag', async () => {
   const user = userEvent.setup();
   renderScreen();
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.clear(screen.getByLabelText('Attack'));
   await user.type(screen.getByLabelText('Attack'), '150');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('heading', { name: 'Collection' });
@@ -180,6 +182,7 @@ it('keeps a second edit on top of an earlier one', async () => {
   await saveCorrection('1-3-001', { stats: { attack: 150 } });
   renderScreen();
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.clear(screen.getByLabelText('HP'));
   await user.type(screen.getByLabelText('HP'), '900');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('heading', { name: 'Collection' });
@@ -190,6 +193,7 @@ it('rejects decimals and negatives with an alert', async () => {
   const user = userEvent.setup();
   renderScreen();
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.clear(screen.getByLabelText('Attack'));
   await user.type(screen.getByLabelText('Attack'), '1.5');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Attack must be a whole number, 0 or more.');
@@ -214,6 +218,7 @@ it('keeps the tag editor open when saving fails', async () => {
   const spy = vi.spyOn(dbModule, 'saveCorrection').mockRejectedValueOnce(new Error('disk full'));
   renderScreen();
   await user.click(await screen.findByRole('button', { name: /^Lugia 1-3-001/ }));
+  await user.clear(screen.getByLabelText('Attack'));
   await user.type(screen.getByLabelText('Attack'), '150');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await vi.waitFor(() => expect(spy).toHaveBeenCalled());

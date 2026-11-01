@@ -73,10 +73,10 @@ export const canvasRasterizer: Rasterizer = async (file, fit) => {
 };
 
 /** Turn a file the player picked into a small JPEG blob, or throw a PhotoError with a readable message. */
-export async function processPhoto(file: Blob, rasterize: Rasterizer = canvasRasterizer): Promise<Blob> {
+export async function processPhoto(file: Blob, rasterize: Rasterizer = canvasRasterizer, maxSide = PHOTO_MAX_SIDE): Promise<Blob> {
   if (!file.type.startsWith('image/')) throw new PhotoError('That file is not an image. Choose a photo.');
   try {
-    return await rasterize(file, fitWithin);
+    return await rasterize(file, (w, h) => fitWithin(w, h, maxSide));
   } catch {
     throw new PhotoError('Could not read that image. Try a different photo.');
   }

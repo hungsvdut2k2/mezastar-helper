@@ -2,7 +2,7 @@ import type { PlayLogEntry, Tag } from '../data/types';
 
 export type TagOverrides = Partial<Omit<Tag, 'stats'>> & { stats?: Partial<Tag['stats']> };
 
-/** A Normal-type test tag with known stats: HP 1000, Attack 100, Defense 0, Speed 100. */
+/** A Normal-type test tag with known stats: HP 1000, Attack and Sp. Atk 100, Defense and Sp. Def 0, Speed 100. */
 export function makeTag(id: string, overrides: TagOverrides = {}): Tag {
   const { stats, ...rest } = overrides;
   return {
@@ -11,8 +11,8 @@ export function makeTag(id: string, overrides: TagOverrides = {}): Tag {
     grade: 4,
     types: ['normal'],
     pokenergy: null,
-    stats: { hp: 1000, attack: 100, defense: 0, speed: 100, ...stats },
-    move: { name: 'Tackle', type: 'normal' },
+    stats: { hp: 1000, attack: 100, defense: 0, spAttack: 100, spDefense: 0, speed: 100, ...stats },
+    move: { name: 'Tackle', type: 'normal', category: 'physical' },
     gimmick: null,
     legendary: false,
     mythical: false,

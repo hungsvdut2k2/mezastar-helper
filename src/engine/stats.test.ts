@@ -37,7 +37,7 @@ describe('computeStats', () => {
   });
 
   it('labels targets with no grade as "Unknown grade (2–4★ or not set)", after the numbered grades', () => {
-    const plain = computeStats([makeLogEntry({ target: '1-3-029' }), makeLogEntry({ target: '1-3-001' })], TAGS);
+    const plain = computeStats([makeLogEntry({ target: '2-2-030' }), makeLogEntry({ target: '1-3-001' })], TAGS);
     expect(plain.byTargetGrade.map((g) => g.grade)).toEqual(['6★', 'Unknown grade (2–4★ or not set)']);
   });
 

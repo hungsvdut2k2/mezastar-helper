@@ -16,6 +16,24 @@ describe('damage', () => {
     expect(damage(fire, makeTag('g', { types: ['grass'], stats: { defense: 200 } }), false)).toBe(100);
   });
 
+  it('uses Sp. Atk ÷ Sp. Def for a special move, and its category for the special move too', () => {
+    const lunala = makeTag('l', {
+      move: { name: 'Moongeist Beam', type: 'ghost', category: 'special' },
+      stats: { attack: 50, spAttack: 160 },
+      gimmick: { kind: 'zmove', moveName: 'Menacing Moonraze Maelstrom', moveType: 'ghost' },
+    });
+    const wall = makeTag('w', { types: ['psychic'], stats: { defense: 0, spDefense: 200 } });
+    expect(damage(lunala, wall, false)).toBe(160); // 160 × 2 ÷ (1 + 200/200)
+    expect(damage(lunala, wall, true)).toBeCloseTo(160 * MODEL.gimmickMultiplier.zmove);
+  });
+
+  it('counts a move with no known category as physical or special by the higher attacking stat', () => {
+    const hit = (attack: number, spAttack: number) => makeTag('t', { move: { name: 'Hit', type: 'normal' }, stats: { attack, spAttack } });
+    const o = makeTag('o', { stats: { defense: 0, spDefense: 200 } });
+    expect(damage(hit(120, 80), o, false)).toBe(120);
+    expect(damage(hit(80, 120), o, false)).toBe(60);
+  });
+
   it('uses the special move type and multiplier on the first attack only', () => {
     const z = makeTag('z', { gimmick: { kind: 'zmove', moveName: 'Black Hole Eclipse', moveType: 'dark' } });
     const psychic = makeTag('p', { types: ['psychic'] });
