@@ -28,5 +28,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Screen tests click through real team searches: a few seconds locally, about 2.5x that on the CI runner.
+    testTimeout: 20_000,
   },
 });
