@@ -18,6 +18,35 @@ it('plans for a Superstar picked with one tap, using unknown cronies', async () 
   expect(screen.getAllByText(/^Defeats Lugia in \d+% of 200 sampled crony pairs \(of [\d,]+ possible\) from Stardust V3\.$/).length).toBeGreaterThan(0);
 });
 
+it('builds target teams from every tag by default, saying which members are missing, or only from owned tags', async () => {
+  for (const id of ['1-3-002', '1-3-008']) await setOwned(id, true);
+  const user = userEvent.setup();
+  render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
+  await user.click(await screen.findByRole('button', { name: 'Lugia 1-3-001' }));
+  expect(screen.getByRole('button', { name: 'Every tag' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getAllByText(/^You own \d of 3\. Missing: |^You own all of these\.$/)).toHaveLength(3);
+  await user.click(screen.getByRole('button', { name: 'Only my tags' }));
+  expect(screen.getByText(/^Team 1: (Ho-Oh \+ Keldeo|Keldeo \+ Ho-Oh)$/)).toBeInTheDocument();
+  expect(screen.queryByText(/^You own \d of 3/)).not.toBeInTheDocument();
+});
+
+it('leaves out an unticked set when picking from every tag', async () => {
+  const user = userEvent.setup();
+  render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
+  await user.click(await screen.findByRole('button', { name: 'Lugia 1-3-001' }));
+  const teams = () => screen.getAllByText(/^Team \d:/).map((h) => h.textContent).join(' ');
+  for (const name of ['Stardust V1', 'Stardust V2', 'Stardust V4', 'Galaxy V1', 'Galaxy V2', 'Galaxy V3']) {
+    await user.click(screen.getByRole('checkbox', { name }));
+  }
+  expect(screen.getByRole('checkbox', { name: 'Stardust V3' })).toBeChecked();
+  const v3Only = teams();
+  await user.click(screen.getByRole('checkbox', { name: 'Stardust V3' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Stardust V1' }));
+  expect(teams()).not.toBe(v3Only);
+  // Stardust V1 lists no Regular Tags, so every member now comes from it.
+  for (const card of document.querySelectorAll('.card .team-grid > *')) expect(card).toHaveTextContent('Stardust V1');
+});
+
 it('offers the Superstars of the chosen set only, labelled with name and code', async () => {
   const user = userEvent.setup();
   render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);

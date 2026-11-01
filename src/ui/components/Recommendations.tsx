@@ -5,6 +5,7 @@ import { UNKNOWN_PREFIX, type Battle } from '../../engine/battleModel';
 import { recommend, recommendOverCronies, type CronyOdds, type Recommendation } from '../../engine/recommend';
 import { UNKNOWN_STATS_NOTE } from '../../engine/teamScoring';
 import { TRUST_LABEL } from '../format';
+import { OwnershipNote } from './BestTeam';
 import { TagCard } from './TagCard';
 
 type Props = {
@@ -18,6 +19,10 @@ type Props = {
    * over this pool instead of the neutral stand-in.
    */
   cronyPool?: Tag[];
+  /** When teams are picked from every tag: ids the player owns, to say which members are missing. */
+  ownedIds?: ReadonlySet<string>;
+  /** Overrides the "mark 2 tags as owned" message shown when fewer than 2 candidates exist. */
+  tooFewMessage?: string;
 };
 
 const REMINDERS = [
@@ -28,7 +33,7 @@ const REMINDERS = [
 
 const known = (t: Tag) => (t.id.startsWith(UNKNOWN_PREFIX) ? null : t);
 
-export function Recommendations({ owned, battle, onUseTeam, photos, cronyPool }: Props) {
+export function Recommendations({ owned, battle, onUseTeam, photos, cronyPool, ownedIds, tooFewMessage }: Props) {
   const recs = useMemo(() => {
     const [target, c1, c2] = battle.opponents;
     return cronyPool && battle.targetIndex === 0
@@ -36,7 +41,7 @@ export function Recommendations({ owned, battle, onUseTeam, photos, cronyPool }:
       : recommend(owned, battle);
   }, [owned, battle, cronyPool]);
   if (owned.length < 2) {
-    return <p className="notice">Mark at least 2 tags as owned in Collection to get a team and battle plan.</p>;
+    return <p className="notice">{tooFewMessage ?? 'Mark at least 2 tags as owned in Collection to get a team and battle plan.'}</p>;
   }
   return (
     <div>
@@ -52,6 +57,7 @@ export function Recommendations({ owned, battle, onUseTeam, photos, cronyPool }:
           rec={rec}
           target={battle.opponents[battle.targetIndex]}
           photos={photos}
+          ownedIds={ownedIds}
           onUse={onUseTeam && (() => onUseTeam(rec))}
         />
       ))}
@@ -67,9 +73,16 @@ export function oddsText(o: CronyOdds, target: Tag): string {
   return `Defeats ${target.name} in ${pct(o)}% of ${of} from ${setLabel(target)}.`;
 }
 
-type CardProps = { rank: number; rec: Recommendation; target: Tag; photos?: ReadonlyMap<string, string>; onUse?: () => void };
+type CardProps = {
+  rank: number;
+  rec: Recommendation;
+  target: Tag;
+  photos?: ReadonlyMap<string, string>;
+  ownedIds?: ReadonlySet<string>;
+  onUse?: () => void;
+};
 
-function TeamCard({ rank, rec, target, photos, onUse }: CardProps) {
+function TeamCard({ rank, rec, target, photos, ownedIds, onUse }: CardProps) {
   return (
     <article className="card">
       <h3>{`Team ${rank}: ${rec.team.map((t) => t.name).join(' + ')}`}</h3>
@@ -78,6 +91,7 @@ function TeamCard({ rank, rec, target, photos, onUse }: CardProps) {
           <TagCard key={t.id} tag={t} size="medium" photoUrl={photos?.get(t.id)} />
         ))}
       </div>
+      {ownedIds && <OwnershipNote team={rec.team} owned={ownedIds} />}
       {/* With a plan, the plan block explains unknown stats once; don't repeat it in the reason line. */}
       <p className="reason">{rec.plan ? rec.reason.replace(UNKNOWN_STATS_NOTE, '') : rec.reason}</p>
       {rec.plan ? (
