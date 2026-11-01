@@ -4,7 +4,7 @@ import { attackOf, type Battle } from '../../engine/battleModel';
 import { cronyPool, unknownOpponent } from '../../engine/recommend';
 import { BestTeam, ScopeSwitch, type Scope } from '../components/BestTeam';
 import { Recommendations } from '../components/Recommendations';
-import { printedCode } from '../../data/setInfo';
+import { printedCode, SETS, setsOfTag, type AnySetId } from '../../data/setInfo';
 import { typeVars } from '../components/TagCard';
 import { TagPicker } from '../components/TagPicker';
 import { DEFAULT_SET, inSetChoice, SET_CHOICES, type SetChoice } from '../setChoices';
@@ -44,7 +44,20 @@ export function PlanScreen({ store }: { store: AppStore }) {
   const ownedIds = useMemo(() => new Set(store.data.owned), [store.data.owned]);
   // Every tag the battle model can judge: HP, the attacking stat and Speed known.
   const statted = useMemo(() => store.tags.filter((t) => t.stats.hp !== null && attackOf(t) !== null && t.stats.speed !== null), [store.tags]);
-  const candidates = scope === 'all' ? statted : owned;
+  const [excludedSets, setExcludedSets] = useState<ReadonlySet<AnySetId>>(new Set());
+  const toggleSet = (id: AnySetId, on: boolean) =>
+    setExcludedSets((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  // A Regular Tag listed in several sets stays while any of them is included.
+  const fromSets = useMemo(
+    () => statted.filter((t) => setsOfTag(t).some((s) => !excludedSets.has(s.id))),
+    [statted, excludedSets],
+  );
+  const candidates = scope === 'all' ? fromSets : owned;
   const blankCrony = !crony1 || !crony2;
 
   return (
@@ -87,7 +100,20 @@ export function PlanScreen({ store }: { store: AppStore }) {
       {battle && (
         <>
           <ScopeSwitch scope={scope} onChange={setScope} />
-          {scope === 'all' && <p className="hint">Teams from every tag with known stats, whether you own it or not.</p>}
+          {scope === 'all' && (
+            <>
+              <p className="hint">Teams from every tag with known stats, whether you own it or not.</p>
+              <fieldset className="set-filter">
+                <legend>Pick from these sets</legend>
+                {SETS.map((set) => (
+                  <label key={set.id} className="check">
+                    <input type="checkbox" checked={!excludedSets.has(set.id)} onChange={(e) => toggleSet(set.id, e.target.checked)} />
+                    {set.name}
+                  </label>
+                ))}
+              </fieldset>
+            </>
+          )}
           <Recommendations
             owned={candidates}
             battle={battle}

@@ -131,6 +131,8 @@ small { color: var(--muted); font-weight: 400; }
 
 /* rows of buttons */
 .segmented { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.set-filter { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0 12px; margin: 8px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.set-filter legend { padding: 0 6px; font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .chips button { border-left: 6px solid var(--t, var(--line-strong)); text-align: left; max-width: 100%; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
