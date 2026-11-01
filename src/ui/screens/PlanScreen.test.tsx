@@ -33,18 +33,12 @@ it('builds target teams from every tag by default, saying which members are miss
 it('leaves out an unticked set when picking from every tag', async () => {
   const user = userEvent.setup();
   render(<WithStore>{(store) => <PlanScreen store={store} />}</WithStore>);
-  await user.click(await screen.findByRole('button', { name: 'Lugia 1-3-001' }));
+  await user.click(await screen.findByRole('button', { name: 'Ho-Oh 1-3-002' }));
   const teams = () => screen.getAllByText(/^Team \d:/).map((h) => h.textContent).join(' ');
-  for (const name of ['Stardust V1', 'Stardust V2', 'Stardust V4', 'Galaxy V1', 'Galaxy V2', 'Galaxy V3']) {
-    await user.click(screen.getByRole('checkbox', { name }));
-  }
-  expect(screen.getByRole('checkbox', { name: 'Stardust V3' })).toBeChecked();
-  const v3Only = teams();
-  await user.click(screen.getByRole('checkbox', { name: 'Stardust V3' }));
-  await user.click(screen.getByRole('checkbox', { name: 'Stardust V1' }));
-  expect(teams()).not.toBe(v3Only);
-  // Stardust V1 lists no Regular Tags, so every member now comes from it.
-  for (const card of document.querySelectorAll('.card .team-grid > *')) expect(card).toHaveTextContent('Stardust V1');
+  // Both Calyrex tags are Stardust V4 only, and rank high against Ho-Oh.
+  expect(teams()).toContain('Calyrex');
+  await user.click(screen.getByRole('checkbox', { name: 'Stardust V4' }));
+  expect(teams()).not.toContain('Calyrex');
 });
 
 it('offers the Superstars of the chosen set only, labelled with name and code', async () => {
