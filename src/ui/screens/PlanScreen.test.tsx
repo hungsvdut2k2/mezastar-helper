@@ -14,6 +14,8 @@ it('plans for a Superstar picked with one tap, using unknown cronies', async () 
   await user.click(await screen.findByRole('button', { name: 'Lugia 1-3-001' }));
   expect(screen.getByText(/^Team 1:/)).toBeInTheDocument();
   expect(screen.getAllByText(/Unknown crony/).length).toBeGreaterThan(0);
+  expect(screen.getByText(/Teams are ranked by their average against every Pokémon from the same set/)).toBeInTheDocument();
+  expect(screen.getAllByText(/^Defeats Lugia in \d+% of 200 sampled crony pairs \(of [\d,]+ possible\) from Stardust V3\.$/).length).toBeGreaterThan(0);
 });
 
 it('offers the Superstars of the chosen set only, labelled with name and code', async () => {

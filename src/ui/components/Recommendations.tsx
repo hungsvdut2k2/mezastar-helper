@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import type { Tag } from '../../data/types';
-import type { Battle } from '../../engine/battleModel';
-import { recommend, type Recommendation } from '../../engine/recommend';
+import { setLabel } from '../../data/setInfo';
+import { UNKNOWN_PREFIX, type Battle } from '../../engine/battleModel';
+import { recommend, recommendOverCronies, type CronyOdds, type Recommendation } from '../../engine/recommend';
 import { UNKNOWN_STATS_NOTE } from '../../engine/teamScoring';
 import { TRUST_LABEL } from '../format';
 import { TagCard } from './TagCard';
@@ -12,6 +13,11 @@ type Props = {
   onUseTeam?: (rec: Recommendation) => void;
   /** The player's tag photos (tag id → object URL). */
   photos?: ReadonlyMap<string, string>;
+  /**
+   * Tags that could fill a blank crony slot (Plan screen). When given, blank cronies are averaged
+   * over this pool instead of the neutral stand-in.
+   */
+  cronyPool?: Tag[];
 };
 
 const REMINDERS = [
@@ -20,8 +26,15 @@ const REMINDERS = [
   'If "Everyone Attack!" appears, slide all your tags forward.',
 ];
 
-export function Recommendations({ owned, battle, onUseTeam, photos }: Props) {
-  const recs = useMemo(() => recommend(owned, battle), [owned, battle]);
+const known = (t: Tag) => (t.id.startsWith(UNKNOWN_PREFIX) ? null : t);
+
+export function Recommendations({ owned, battle, onUseTeam, photos, cronyPool }: Props) {
+  const recs = useMemo(() => {
+    const [target, c1, c2] = battle.opponents;
+    return cronyPool && battle.targetIndex === 0
+      ? recommendOverCronies(owned, target, [known(c1), known(c2)], cronyPool)
+      : recommend(owned, battle);
+  }, [owned, battle, cronyPool]);
   if (owned.length < 2) {
     return <p className="notice">Mark at least 2 tags as owned in Collection to get a team and battle plan.</p>;
   }
@@ -37,6 +50,7 @@ export function Recommendations({ owned, battle, onUseTeam, photos }: Props) {
           key={rec.team.map((t) => t.id).join('+')}
           rank={i + 1}
           rec={rec}
+          target={battle.opponents[battle.targetIndex]}
           photos={photos}
           onUse={onUseTeam && (() => onUseTeam(rec))}
         />
@@ -45,7 +59,17 @@ export function Recommendations({ owned, battle, onUseTeam, photos }: Props) {
   );
 }
 
-function TeamCard({ rank, rec, photos, onUse }: { rank: number; rec: Recommendation; photos?: ReadonlyMap<string, string>; onUse?: () => void }) {
+const pct = (o: CronyOdds) => Math.round((100 * o.wins) / o.pairs);
+
+/** e.g. "Defeats Lugia in 92% of 200 sampled crony pairs (of 2,556 possible from Stardust V3)." */
+export function oddsText(o: CronyOdds, target: Tag): string {
+  const of = o.pairs === o.totalPairs ? `${o.pairs} possible crony ${o.pairs === 1 ? 'pair' : 'pairs'}` : `${o.pairs} sampled crony pairs (of ${o.totalPairs.toLocaleString('en')} possible)`;
+  return `Defeats ${target.name} in ${pct(o)}% of ${of} from ${setLabel(target)}.`;
+}
+
+type CardProps = { rank: number; rec: Recommendation; target: Tag; photos?: ReadonlyMap<string, string>; onUse?: () => void };
+
+function TeamCard({ rank, rec, target, photos, onUse }: CardProps) {
   return (
     <article className="card">
       <h3>{`Team ${rank}: ${rec.team.map((t) => t.name).join(' + ')}`}</h3>
@@ -77,6 +101,11 @@ function TeamCard({ rank, rec, photos, onUse }: { rank: number; rec: Recommendat
             ))}
           </ol>
           <p className="comparison">{rec.plan.comparison}</p>
+          {rec.odds && (
+            <p className="odds">
+              {oddsText(rec.odds, target)} <small className="hint">Every Pokémon in the set counted as equally likely.</small>
+            </p>
+          )}
           {rec.plan.kind === 'searched' && rec.plan.usesUnknownStats && (
             <p className="hint">Some stats are unknown, so these numbers are rough estimates.</p>
           )}

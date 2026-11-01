@@ -4,6 +4,9 @@ import { saveCorrection, setOwned } from '../storage/db';
 import { freshDb } from '../test/freshDb';
 import { App } from './App';
 
+// Whole-app tests type and click through several screens: ~2 s locally, over 5 s on the CI runner.
+vi.setConfig({ testTimeout: 20_000 });
+
 beforeEach(freshDb);
 
 it('opens on Play and switches screens from the tab bar', async () => {
